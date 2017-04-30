@@ -1,0 +1,22 @@
+#/bin/bash
+/srv/scratch/annashch/ukbb/ukbfetch -bto_download.accel.txt -s2501 -m500 -of6
+/srv/scratch/annashch/ukbb/ukbfetch -bto_download.accel.txt -s7501 -m500 -of16
+/srv/scratch/annashch/ukbb/ukbfetch -bto_download.accel.txt -s12501 -m500 -of26
+/srv/scratch/annashch/ukbb/ukbfetch -bto_download.accel.txt -s17501 -m500 -of36
+/srv/scratch/annashch/ukbb/ukbfetch -bto_download.accel.txt -s22501 -m500 -of46
+/srv/scratch/annashch/ukbb/ukbfetch -bto_download.accel.txt -s27501 -m500 -of56
+/srv/scratch/annashch/ukbb/ukbfetch -bto_download.accel.txt -s32501 -m500 -of66
+/srv/scratch/annashch/ukbb/ukbfetch -bto_download.accel.txt -s37501 -m500 -of76
+/srv/scratch/annashch/ukbb/ukbfetch -bto_download.accel.txt -s42501 -m500 -of86
+/srv/scratch/annashch/ukbb/ukbfetch -bto_download.accel.txt -s47501 -m500 -of96
+/srv/scratch/annashch/ukbb/ukbfetch -bto_download.accel.txt -s52501 -m500 -of106
+/srv/scratch/annashch/ukbb/ukbfetch -bto_download.accel.txt -s57501 -m500 -of116
+/srv/scratch/annashch/ukbb/ukbfetch -bto_download.accel.txt -s62501 -m500 -of126
+/srv/scratch/annashch/ukbb/ukbfetch -bto_download.accel.txt -s67501 -m500 -of136
+/srv/scratch/annashch/ukbb/ukbfetch -bto_download.accel.txt -s72501 -m500 -of146
+/srv/scratch/annashch/ukbb/ukbfetch -bto_download.accel.txt -s77501 -m500 -of156
+/srv/scratch/annashch/ukbb/ukbfetch -bto_download.accel.txt -s82501 -m500 -of166
+/srv/scratch/annashch/ukbb/ukbfetch -bto_download.accel.txt -s87501 -m500 -of176
+/srv/scratch/annashch/ukbb/ukbfetch -bto_download.accel.txt -s92501 -m500 -of186
+/srv/scratch/annashch/ukbb/ukbfetch -bto_download.accel.txt -s97501 -m500 -of196
+/srv/scratch/annashch/ukbb/ukbfetch -bto_download.accel.txt -s102501 -m500 -of206
