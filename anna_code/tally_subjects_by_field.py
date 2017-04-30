@@ -57,7 +57,11 @@ def main():
     print("generating output file!") 
     for field in field_dict:
         #get the field name & category information
-        metadata=name_map[field.split('.')[1]] 
+        try:
+            metadata=name_map[field.split('.')[1]]
+        except:
+            print('WARNING!:field'+str(field)+' is not found in the field name set -- you will need to look it up manually')
+            metadata=[field,'','','']
         outf.write('\t'.join(metadata)+'\t'+str(field_dict[field])+'\n')
         
     
