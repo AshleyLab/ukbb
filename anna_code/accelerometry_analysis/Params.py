@@ -1,5 +1,5 @@
 #"Magic Numbers"
-expected_number_datapoints=120961
+expected_number_datapoints=120960
 sample_rate=5 #seconds
 start_day_indices=[0,
                    14*60*12,

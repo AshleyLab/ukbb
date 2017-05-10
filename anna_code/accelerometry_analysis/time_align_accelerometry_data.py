@@ -33,6 +33,7 @@ def main():
         observed_order=range(starting_day,7)+range(starting_day)
         #print(str(observed_order))
         day_to_vals=dict()
+        data=data[1::]#remove the header 
         for i in range(7):
             key=observed_order[i]
             values=data[start_day_indices[i]:end_day_indices[i]]
