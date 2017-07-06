@@ -1,0 +1,15 @@
+f.806.0.0	JobInvolvesMainlyWalkingOrStanding	categorical
+f.816.0.0	JobInvolvesHeavyManualOrPhysicalWork	categorical
+f.826.0.0	JobInvolvesShiftWork	categorical
+f.864.0.0	NumberDaysWalked10Minutes	continuous
+f.874.0.0	DurationOfWalks	continuous
+f.884.0.0	NumberOfDaysModeratePhysicalActivity	continuous
+f.894.0.0	DurationModerateActivity	continuous
+f.904.0.0	NumberOfDaysVigorousPhysicalActivity	continuous
+f.924.0.0	UsualWalkingPace	continuous
+f.971.0.0	FrequencyWalkingForPleasure	continuous
+f.981.0.0	DurationWalkingForPleasure	continuous
+f.991.0.0	FrequencyStrenuousSportsLast4Weeks	continuous
+f.1001.0.0	DurationStrenuousSports	continuous
+f.1050.0.0	TimeSpentOutdoorsSummer	continuous
+f.1060.0.0	TimeSpentOutdoorsWinter	continuous
