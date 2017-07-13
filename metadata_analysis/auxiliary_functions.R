@@ -174,78 +174,112 @@ get_lm_residuals<-function(y,covs,use_categorical=T,max_num_classes=5,
   return(list(lm_obj=lm_obj,inds=inds))
 }
 
-
-
-
-################### Changes to some MTS functions ######################
-VARXpred2<-function (m1, newxt = NULL, hstep = 1, orig = 0) 
-{
-  zt = as.matrix(m1$data)
-  xt = as.matrix(m1$xt)
-  p = m1$aror
-  m = m1$m
-  Ph0 = as.matrix(m1$Ph0)
-  Phi = as.matrix(m1$Phi)
-  Sig = as.matrix(m1$Sigma)
-  beta = as.matrix(m1$beta)
-  include.m = m1$include.mean
-  nT = dim(zt)[1]
-  k = dim(zt)[2]
-  dx = dim(xt)[2]
-  se = NULL
-  if (length(Ph0) < 1) 
-    Ph0 = matrix(rep(0, k), k, 1)
-  if (hstep < 1) 
-    hstep = 1
-  if (orig < 1) 
-    orig = nT
-  if (length(newxt) > 0) {
-    if (!is.matrix(newxt)) 
-      newxt = as.matrix(newxt)
-    h1 = dim(newxt)[1]
-    hstep = min(h1, hstep)
-    nzt = as.matrix(zt[1:orig, ])
-    xt = rbind(xt[1:orig, , drop = FALSE], newxt)
-    for (i in 1:hstep) {
-      tmp = Ph0
-      ti = orig + i
-      for (i in 1:p) {
-        idx = (i - 1) * k
-        tmp = tmp + Phi[, (idx + 1):(idx + k)] %*% matrix(nzt[ti - 
-                                                                i, ], k, 1)
-      }
-      if (m > -1) {
-        for (j in 0:m) {
-          jdx = j * dx
-          tmp = tmp + beta[, (jdx + 1):(jdx + dx)] %*% 
-            matrix(xt[ti - j, ], dx, 1)
-        }
-      }
-      nzt = rbind(nzt, c(tmp))
-    }
-    mm = VARpsi(Phi, lag = hstep)
-    Si = Sig
-    se = matrix(sqrt(diag(Si)), 1, k)
-    if (hstep > 1) {
-      for (i in 2:hstep) {
-        idx = (i - 1) * k
-        wk = as.matrix(mm$psi[, (idx + 1):(idx + k)])
-        Si = Si + wk %*% Sig %*% t(wk)
-        se1 = sqrt(diag(Si))
-        se = rbind(se, se1)
-      }
-    }
-    #cat("Prediction at origin: ", orig, "\n")
-    #cat("Point forecasts (starting with step 1): ", "\n")
-    #print(round(nzt[(orig + 1):(orig + hstep), ], 5))
-    #cat("Corresponding standard errors: ", "\n")
-    #print(round(se[1:hstep, ], 5))
-    return(cbind(
-      round(nzt[(orig + 1):(orig + hstep), ], 5),
-      round(se[1:hstep, ], 5)
-    ))
+# Create a list of matrices that correspond to the data gathered from the ECG Test.
+# The matrices created are: time, workload, phase, and heart rate.
+# This function gets a pheno data matrix that contains a single time series
+# (at most) per subject.
+extract_regex_matrices<-function(pheno_data){
+  regex_list = list()
+  regex_list[["time"]] = "ECG, phase time"
+  regex_list[["workload"]] = "ECG, load"
+  regex_list[["phase"]] = "ECG, trend phase name"
+  regex_list[["heartrate"]] = "ECG, heart rate"
+  regex_cols = list()
+  for(nn in names(regex_list)){
+    regex_cols[[nn]] = get_regex_cols(colnames(pheno_data),regex_list[[nn]])
   }
-  else {
-    cat("Need new data for input variables!", "\n")
+  regex_matrices = list()
+  for(nn in names(regex_list)){
+    regex_matrices[[nn]] = as.matrix(pheno_data[,regex_cols[[nn]]])
+  }
+  return(regex_matrices)
+}
+
+# The input here is an entry of tps_vs_wkls.
+# These objects are obtained after running get_segment_input
+extract_regression_input_from_tp_and_wklds<-function(curr_input){
+  if(!curr_input$is_mono || length(curr_input$value)<MIN_REGR_SIZE){
+    return(list(HR=c(),WD=c(),TP=c()))
+  }
+  ind1 = curr_input$start_index
+  ind2 = curr_input$end_index
+  x = as.numeric(regex_matrices[["heartrate"]][j,ind1:ind2])
+  y = as.numeric(regex_matrices[["workload"]][j,ind1:ind2])
+  z = as.numeric(regex_matrices$time[j,ind1:ind2])
+  inds = !is.na(x) & !is.na(y)
+  x=x[inds];y=y[inds];z=z[inds]
+  if(length(z)<MIN_REGR_SIZE){
+    return(list(HR=c(),WD=c(),TP=c()))
+  }
+  if(MERGE_SAME_WORKLOADS){
+    HR = as.numeric(tapply(x,y,mean,na.rm=T))
+    TP = as.numeric(tapply(z,y,mean,na.rm=T))
+    WD = as.numeric(tapply(y,y,mean,na.rm=T))
+    return(list(HR=HR,WD=WD,TP=TP))
+  }
+  else{
+    return(list(HR=x,WD=y,TP=z))
   }
 }
+
+# This function first performs a set of tests:
+# 1. That the quality rho_exercise score is high
+# 2. That there are time points (i.e., > MIN_REGR_SIZE)
+# 3. That the regression coefficient is positive and the R2 is high
+# If the current subject data fails in any of them
+# then the functions returns NA
+# Otherwise an lm object is returned.
+get_lm_object_for_hr_prediction<-function(lm_input,rho_exercise,
+                                          thr1=RHO_Q_THRESHOLD,thr2=R2_Q_THRESHOLD){
+  if(is.null(lm_input) || is.na(rho_exercise) || rho_exercise< thr1){
+    return(NA)
+  }
+  WD = lm_input$WD; HR = lm_input$HR;TP = lm_input$TP
+  if(is.null(WD) || length(WD) < 5){
+    return(NA)
+  }
+  lm_obj = lm(HR~WD)
+  if (lm_obj$coefficients[2]<0 | get_lm_r2(lm_obj) < thr2){
+    return(NA)
+  }
+  return (lm_obj)
+}
+
+get_prediction_from_lm_object_for_hr<-function(obj,WD){
+  if(is.null(obj) || is.na(obj)){
+    return(NA)
+  }
+  return (unname(predict(obj,data.frame(WD=WD))))
+}
+
+# Like the exercise phase analysis, this function tests
+# the data and then computes the score.
+# If any of the following tests fail, the function returns NA:
+# 1. There is a rho_test score and it is high
+# 2. There is a time point that is close enough to the requested one
+get_rest_phase_fitness_score<-function(rest_data,rho_rest,rest_time = 60,
+                                       smooth_data=T,use_ratio=T,max_time_diff = 3){
+  TP = rest_data$TP
+  HR = as.numeric(rest_data$HR)
+  WD = as.numeric(rest_data$WD)
+  v1=c();v2=c();v3=c()
+  if(is.na(rho_rest) || rho_rest> -0.5){
+    return(NA)
+  }
+  if(smooth_data && length(HR)>3){
+    try({
+      HR_smoothed = smooth.spline(HR)
+      HR = HR_smoothed$y
+    })
+  }
+  tt = rest_time
+  tt_char = as.character(tt)
+  t_diffs = abs(TP-tt)
+  inds = which(t_diffs<=max_time_diff)
+  if(length(inds)==0 || sum(inds)==0){return(NA)}
+  tt_ind = which(t_diffs==min(t_diffs))[1]
+  if(!use_ratio){return(HR[1] - HR[tt_ind])}
+  return(HR[tt_ind]/HR[1])
+}
+
+
