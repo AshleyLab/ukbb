@@ -283,4 +283,33 @@ get_rest_phase_fitness_score<-function(rest_data,rho_rest,rest_time = 60,
   return(HR[tt_ind]/HR[1])
 }
 
+# A function that merges the results of the fitness scores computation
+merge_scores_list<-function(l,plot_class_averages = T,...){
+  all_subjects = c()
+  for(x in l){
+    all_subjects = union(all_subjects,names(x))
+  }
+  l = lapply(l,function(x)x[!is.na(x)])
+  scores = rep(0,length(all_subjects));classes = rep(NA,length(all_subjects));counts = rep(0,length(all_subjects))
+  names(scores) = all_subjects;names(classes) = all_subjects;names(counts) = all_subjects
+  for(nn in names(l)){
+    curr_scores = l[[nn]]
+    curr_names = names(curr_scores)
+    scores[curr_names] = scores[curr_names] + curr_scores
+    counts[curr_names] = counts[curr_names] + 1
+    curr_classes = classes[curr_names]
+    curr_na_classes = is.na(curr_classes)
+    curr_classes[curr_na_classes] = nn
+    curr_classes[!curr_na_classes] = "multiple"
+    classes[curr_names] = curr_classes
+  }
+  table(counts)
+  tests = all(is.na(classes[counts==0]))
+  tests = tests & all(names(which(counts=="multiple")) == names(which(counts>1)))
+  scores[counts>1] = scores[counts>1]/counts[counts>1]
+  scores[counts==0] = NA
+  d = data.frame(scores=scores,classes=classes)
+  if(plot_class_averages){plot.design(d,...)}
+  return(d)
+}
 
