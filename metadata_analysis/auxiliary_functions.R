@@ -132,26 +132,29 @@ try({library('impute')})
 # and a set of covariates
 # OPTIONAL filter - additional_subcategories_to_exclude - which covariate categories to exclude
 # feature2subcategory - a mapping of covariates into categories
-get_lm_residuals<-function(y,covs,use_categorical=T,max_num_classes=5,
-                           feature_is_numeric,additional_subcategories_to_exclude=NULL,feature2subcategory=NULL){
+get_lm_residuals<-function(y,covs,use_categorical=T,max_num_classes=5, max_allowed_na_per = 0.2,
+                           feature_is_numeric,additional_subcategories_to_exclude=NULL){
   inds = !is.na(y)
   if(!is.null(additional_subcategories_to_exclude)){
     col_inds = !is.element(colnames(covs),set=additional_subcategories_to_exclude)
     covs = covs[,col_inds]
   }
-  y = y[inds]; covs = covs[inds,]
+  y = y[inds]
+  covs = covs[names(y),]
   x = covs[,feature_is_numeric[colnames(covs)]]
   x = as.matrix(x)
   mode(x) = 'numeric'
+  print ("Imputing missing values in numeric part")
   x_imp = impute.knn(x)$data
+  print ("Done imputing missing values in numeric part")
   
-  if(use_categorical){
+  if(use_categorical && sum(!feature_is_numeric[colnames(covs)])>0){
     x2 = covs[,!feature_is_numeric[colnames(covs)]]
     new_x2 = c()
     for (j in 1:ncol(x2)){
       fx = x2[,j]
       fx_table = table(as.character(fx))
-      if(sum(is.na(fx))/length(fx) >= 0.2){next}    
+      if(sum(is.na(fx))/length(fx) >= max_allowed_na_per){next}    
       if(length(fx_table)>max_num_classes || length(fx_table)<2){next}
       if(!is.factor(fx)){fx = as.factor(fx)}
       options(na.action='na.pass')
@@ -162,14 +165,12 @@ get_lm_residuals<-function(y,covs,use_categorical=T,max_num_classes=5,
       #if(all(is.na(fx_mat))){break}
       if(length(fx_mat)==0){next}
       new_x2 = cbind(new_x2,fx_mat)
-      #print(j)
     }
-    #dim(new_x2)
-    #per_Nas = apply(is.na(new_x2),2,sum)/nrow(new_x2)
-    #sort(per_Nas)
     x2_imp = impute.knn(new_x2)$data
     x_imp = cbind(x_imp,x2_imp)
   }
+  print("Done creating the covariate matrix for the regression analysis")
+  print(dim(x_imp))
   lm_obj = lm(y~x_imp,na.action=na.exclude)
   return(list(lm_obj=lm_obj,inds=inds))
 }

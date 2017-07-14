@@ -123,7 +123,7 @@ save(preprocessed_data_slices,file="fitness_analysis_preprocessed_data_slices.RD
 
 ###############################################
 ###############################################
-############### Tests and plots################
+############### Tests and plots ###############
 ###############################################
 ###############################################
 
@@ -652,6 +652,7 @@ colnames(fitness_scores_matrix) = c(
   "Regression slopes",
   "Max achieved WD"
 )
+rownames(fitness_scores_matrix) = rownames(HR_ratios_merged)
 save(HR_ratios_merged,HR_pred_WDs_merged,
      HR_WD_slopes_merged,max_WDs_merged,
      fitness_scores_matrix,file="fitness_analysis_final_fitness_scores.RData")
@@ -700,14 +701,27 @@ merge_scores_list<-function(l,plot_class_averages = T,...){
 ##### Supplementary Figures and stats #########
 ###############################################
 ###############################################
+# By sections in the Supplementary test file:
+# 1.1 The data
+# Subjects with a category - look at category_matrix
+dim(category_matrix)
+subjects_concatenated_category = apply(category_matrix,1,paste,collapse=';')
+subject_categories_repeat1 = table(category_matrix[,1])
+# transform into a nice string
+subject_categories_repeat1 = paste(paste(names(subject_categories_repeat1),subject_categories_repeat1),collapse=",")
+repeat2na_table = apply(category_matrix,2,function(x)table(is.na(x)))
 
-# 
+# 1.2 Analysis of the workloads
+
+# Summary: subjects with fitness scores
+apply(fitness_scores_matrix,2,function(x)table(is.na(x)))
 
 ###############################################
 ###############################################
 #################### End ######################
 ###############################################
 ###############################################
+
 
 
 
