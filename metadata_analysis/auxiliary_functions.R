@@ -167,6 +167,8 @@ get_lm_residuals<-function(y,covs,use_categorical=T,max_num_classes=5, max_allow
       new_x2 = cbind(new_x2,fx_mat)
     }
     x2_imp = impute.knn(new_x2)$data
+    print("Done creating the discrete covariate matrix for the regression analysis")
+    print(dim(x2_imp))
     x_imp = cbind(x_imp,x2_imp)
   }
   print("Done creating the covariate matrix for the regression analysis")
