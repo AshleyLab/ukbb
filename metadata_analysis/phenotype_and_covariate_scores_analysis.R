@@ -85,7 +85,13 @@ pulse_rate_cols = get_regex_cols(colnames(pheno_data),"pulse rate\\.",ignore.cas
 additional_scores[['Pulse rate']] = pheno_data[,pulse_rate_cols]
 hand_grip_cols = get_regex_cols(colnames(pheno_data),"Hand grip",ignore.case=T)
 additional_scores[['hand grip']] = pheno_data[,hand_grip_cols]
+status_cols = get_regex_cols(colnames(pheno_data),"status of test")
+additional_scores[['exercise_test_status']] = pheno_data[,status_cols]
+save(additional_scores,file = "metadata_analysis_additional_scores")
 gc()
+
+# For each additional score: dummy vars, impute, and run PCA
+save(additional_scores,file = "metadata_analysis_additional_scores")
 
 ###############################################
 #################### End ######################
@@ -245,7 +251,7 @@ get_regex_cols(colnames(covariate_matrix),"sex",ignore.case=T)
 get_regex_cols(colnames(covariate_matrix),"height",ignore.case=T)
 get_regex_cols(colnames(covariate_matrix),"weight",ignore.case=T)
 get_regex_cols(colnames(covariate_matrix),"bmi",ignore.case=T)
-tmp_feature = get_regex_cols(colnames(covariate_matrix),"smok",ignore.case=T)
+tmp_feature = get_regex_cols(colnames(covariate_matrix),"smok",ignore.case=T)[2]
 
 # # 1.1 SText 2 (The data)
 # # map to pheno_data and look at the raw features vs the computed ones
@@ -303,6 +309,18 @@ for (fitness_score_ind in 1:ncol(fitness_scores_matrix)){
 }
 r2_scores = sapply(fitness_vs_covs_lm_objects,function(x)summary(x$lm)[["r.squared"]])
 
+# Plot for the report: Figure S2.2 
+par(mfrow=c(2,2))
+r2_scores = sapply(fitness_vs_covs_lm_objects,function(x)summary(x$lm)[["r.squared"]])
+r2_scores = format(r2_scores,digits=2)
+for (fitness_score_ind in 1:ncol(fitness_scores_matrix)){
+  y = fitness_scores_matrix[,fitness_score_ind]
+  currname = colnames(fitness_scores_matrix)[fitness_score_ind]
+  lm1 = fitness_vs_covs_lm_objects[[currname]]
+  plot(y[names(lm1[[1]]$residuals)],lm1[[1]]$residuals,ylab="Residual",xlab="Fitness score",
+       main=paste(currname,", R^2=",r2_scores[fitness_score_ind],sep=""))
+}
+
 accelerometry_scores_to_residuals = list()
 for (j in 1:ncol(accelerometry_scores)){
   y = accelerometry_scores[,j]
@@ -339,6 +357,20 @@ for (j in 1:ncol(accelerometry_scores)){
 }
 # TBD
 additional_scores_residuals = list(){}
+
+# Plot for the report: Figure S2.2 
+load("fitness_analysis_fitness_vs_covs_lm_objects_simple.RData")
+par(mfrow=c(2,2))
+r2_scores = sapply(fitness_vs_covs_lm_objects,function(x)summary(x$lm)[["r.squared"]])
+r2_scores = format(r2_scores,digits=2)
+for (fitness_score_ind in 1:ncol(fitness_scores_matrix)){
+  y = fitness_scores_matrix[,fitness_score_ind]
+  currname = colnames(fitness_scores_matrix)[fitness_score_ind]
+  lm1 = fitness_vs_covs_lm_objects[[currname]]
+  plot(y[names(lm1[[1]]$residuals)],lm1[[1]]$residuals,ylab="Residual",xlab="Fitness score",
+       main=paste(currname,", R^2=",r2_scores[fitness_score_ind],sep=""))
+}
+
 
 # Load the genetic PCA data and print the tables for the GWAS
 # TODO:
@@ -524,6 +556,19 @@ currname = names(covariance_correlation_summary_tables)[ind]
 summary_table = covariance_correlation_summary_tables[[ind]]
 colnames(summary_table)
 
+###############################################
+###############################################
+#################### End ######################
+###############################################
+###############################################
+
+###############################################
+###############################################
+############# Tests and Figures ###############
+###############################################
+###############################################
+
+# Figure S2.1
 x1 = -log(pmax(1e-200,as.numeric(summary_table[,"ChisqP-discretized"])),10)
 y1 = -log(pmax(1e-200,as.numeric(summary_table[,"ChisqP-NA fitness"])),10)
 par(mfrow=c(1,2),mar=c(5,5,5,5))
@@ -533,4 +578,13 @@ summary_table[which(y1>150 & x1<10),1]
 summary_table[which(y1==200 & x1==200),1]
 plot(x=summary_table[,"MI-discretized"],y=summary_table[,"MI-NA fitness"],
      main="Predicted HR: mutual information",xlab="MI vs. scores",ylab="MI vs. NAs",pch=4,lwd=1.5,xlim=c(0,0.2),ylim=c(0,0.2));abline(0,1)
+
+
+# Compare our results to VERSION 1
+load("UKBB_phenotypic_data_for_GWAS.RData")
+x1 = fitness_scores_matrix[,2]
+colnames(fitness_scores)
+x2 = fitness_scores[,2]
+curr_inter = intersect(names(x1),names(x2))
+get_pairwise_corrs(cbind(x1[curr_inter],x2[curr_inter]),method="spearman")
 
