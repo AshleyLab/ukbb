@@ -525,7 +525,6 @@ all(is.na(x1)==is.na(x2))
 ###############################################
 ###############################################
 
-
 par(mfrow=c(2,2))
 HR_ratios = lapply(data_slice2fitness_score_objects,function(x)x$HR_ratios[,2])
 HR_ratios_merged = merge_scores_list(HR_ratios,main = "Rest HR ratios after 60sec")
@@ -555,6 +554,40 @@ rownames(fitness_scores_matrix) = rownames(HR_ratios_merged)
 save(HR_ratios_merged,HR_pred_WDs_merged,
      HR_WD_slopes_merged,max_WDs_merged,
      fitness_scores_matrix,file="fitness_analysis_final_fitness_scores.RData")
+
+# Add binary covariate of completion status
+load("biobank_collated_pheno_data.RData")
+feature_code2name = sapply(colnames(pheno_data),function(x)strsplit(x,split='\\.')[[1]][1])
+status_cols = get_regex_cols(colnames(pheno_data),"status of test")
+exercise_test_status = pheno_data[,status_cols]
+all_nas = apply(is.na(exercise_test_status),1,all)
+exercise_test_status = exercise_test_status[!all_nas,]
+exercise_test_status = merge_columns_by_their_features(exercise_test_status,feature_code2name[colnames(exercise_test_status)])
+v = rep(NA,length(exercise_test_status))
+v[names(exercise_test_status)[exercise_test_status=="Fully completed"]] = "1"
+v[names(exercise_test_status)[exercise_test_status!="Fully completed"]] = "0"
+v = as.numeric(v)
+names(v) = names(exercise_test_status)
+table(v)
+load("fitness_analysis_final_fitness_scores.RData")
+added_subject = setdiff(names(v),rownames(fitness_scores_matrix))
+added_NA_mat = matrix(NA,nrow=length(added_subject),ncol=ncol(fitness_scores_matrix))
+colnames(added_NA_mat) = colnames(fitness_scores_matrix)
+rownames(added_NA_mat) = added_subject
+fitness_scores_matrix = rbind(fitness_scores_matrix,added_NA_mat)
+fitness_scores_matrix = cbind(fitness_scores_matrix,v[rownames(fitness_scores_matrix)])
+colnames(fitness_scores_matrix)[ncol(fitness_scores_matrix)] = "Completed_or_not"
+save(HR_ratios_merged,HR_pred_WDs_merged,
+     HR_WD_slopes_merged,max_WDs_merged,
+     fitness_scores_matrix,file="fitness_analysis_final_fitness_scores.RData")
+
+# Sanity check 1: compare the scores to the previous version 
+load('UKBB_phenotypic_data_for_GWAS.RData')
+x1 = fitness_scores_matrix[,"Predicted HR at WD=100"]
+x2 = fitness_scores[,"HR_pred_100"]
+inter = intersect(names(x1),names(x2))
+plot(x1[inter],x2[inter]);abline(0,1)
+get_pairwise_corrs(cbind(x1[inter],x2[inter]))
 
 ###############################################
 ###############################################

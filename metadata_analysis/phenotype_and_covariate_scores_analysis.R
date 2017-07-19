@@ -60,6 +60,19 @@ accelerometry_scores_all_nas = apply(is.na(accelerometry_scores),1,all)
 table(accelerometry_scores_all_nas)
 accelerometry_scores = accelerometry_scores[!accelerometry_scores_all_nas,]
 
+additional_scores = list()
+spiro_cols = extract_feature_cols_by_category(colnames(pheno_data),feature_code2name,feature_subcategory_data,"Spirometry")
+additional_scores[['Spirometry']] = pheno_data[,spiro_cols]
+dxa_cols = extract_feature_cols_by_category(colnames(pheno_data),feature_code2name,feature_subcategory_data,"DXA assessment")
+additional_scores[['DXA']] = pheno_data[,dxa_cols]
+impedence_cols = get_regex_cols(colnames(pheno_data),"Impedance",ignore.case=T)
+feature_category_data[feature_code2name[impedence_cols]]
+additional_scores[['Impedance']] = pheno_data[,impedence_cols]
+pulse_rate_cols = get_regex_cols(colnames(pheno_data),"pulse rate\\.",ignore.case=T)
+additional_scores[['Pulse rate']] = pheno_data[,pulse_rate_cols]
+hand_grip_cols = get_regex_cols(colnames(pheno_data),"Hand grip",ignore.case=T)
+additional_scores[['hand grip']] = pheno_data[,hand_grip_cols]
+
 ###############################################
 #################### End ######################
 ###############################################
@@ -237,7 +250,6 @@ tmp_feature = get_regex_cols(colnames(covariate_matrix),"smok",ignore.case=T)[2]
 # length(intersect(tmp_raw_na_sets[[1]],tmp_raw_na_sets[[3]]))
 # computed_tmp_feature = covariate_matrix[,tmp_feature[5]]
 
-
 ###############################################
 ###############################################
 #################### End ######################
@@ -250,8 +262,42 @@ tmp_feature = get_regex_cols(colnames(covariate_matrix),"smok",ignore.case=T)[2]
 ###############################################
 ###############################################
 
-# Conservative analysis
+# Simple analysis
+simple_covs = covariate_matrix[,c("Sex","Age when attended assessment centre","Body mass index (BMI)","BMI","Standing height")]
 fitness_vs_covs_lm_objects = list()
+for (fitness_score_ind in 1:ncol(fitness_scores_matrix)){
+  y = fitness_scores_matrix[,fitness_score_ind]
+  currname = colnames(fitness_scores_matrix)[fitness_score_ind]
+  lm1 = get_lm_residuals(y,simple_covs,use_categorical=T,max_num_classes=20,feature_is_numeric=feature_is_numeric)
+  plot(y[names(lm1[[1]]$residuals)],lm1[[1]]$residuals,ylab="Residual",xlab="Fitness score")
+  fitness_vs_covs_lm_objects[[currname]] = lm1
+  save(fitness_vs_covs_lm_objects,file="fitness_analysis_fitness_vs_covs_lm_objects_simple.RData")
+}
+# Plot for the report: Figure S2.2 
+#load("fitness_analysis_fitness_vs_covs_lm_objects_simple.RData")
+par(mfrow=c(2,2))
+r2_scores = sapply(fitness_vs_covs_lm_objects,function(x)summary(x$lm)[["r.squared"]])
+r2_scores = format(r2_scores,digits=2)
+for (fitness_score_ind in 1:ncol(fitness_scores_matrix)){
+  y = fitness_scores_matrix[,fitness_score_ind]
+  currname = colnames(fitness_scores_matrix)[fitness_score_ind]
+  lm1 = fitness_vs_covs_lm_objects[[currname]]
+  plot(y[names(lm1[[1]]$residuals)],lm1[[1]]$residuals,ylab="Residual",xlab="Fitness score",
+       main=paste(currname,", R^2=",r2_scores[fitness_score_ind],sep=""))
+}
+accelerometry_scores_to_residuals = list()
+for (j in 1:ncol(accelerometry_scores)){
+  y = accelerometry_scores[,j]
+  names(y) = rownames(accelerometry_scores)
+  currname = colnames(accelerometry_scores)[j]
+  lm1 = get_lm_residuals(y,simple_covs,use_categorical=T,max_num_classes=20,feature_is_numeric=feature_is_numeric)
+  plot(y[names(lm1[[1]]$residuals)],lm1[[1]]$residuals,ylab="Residual",xlab="Fitness score")
+  accelerometry_scores_to_residuals[[currname]] = lm1[[1]]$residuals
+  save(accelerometry_scores_to_residuals,file="accelereometry_analysis_score_vs_covs_residuals_simple.RData")
+}
+
+# Conservative analysis
+# fitness_vs_covs_lm_objects = list()
 for (fitness_score_ind in 1:ncol(fitness_scores_matrix)){
   y = fitness_scores_matrix[,fitness_score_ind]
   currname = colnames(fitness_scores_matrix)[fitness_score_ind]
@@ -283,45 +329,6 @@ for (j in 1:ncol(accelerometry_scores)){
   plot(y[names(lm1[[1]]$residuals)],lm1[[1]]$residuals,ylab="Residual",xlab="Fitness score")
   accelerometry_scores_to_residuals[[currname]] = lm1[[1]]$residuals
   save(accelerometry_scores_to_residuals,file="accelereometry_analysis_score_vs_covs_residuals_conservative.RData")
-}
-# TBD
-additional_scores_residuals = list(){}
-
-# Simple analysis
-simple_covs = covariate_matrix[,c("Sex","Age when attended assessment centre","Body mass index (BMI)","BMI","Standing height")]
-fitness_vs_covs_lm_objects = list()
-for (fitness_score_ind in 1:ncol(fitness_scores_matrix)){
-  y = fitness_scores_matrix[,fitness_score_ind]
-  currname = colnames(fitness_scores_matrix)[fitness_score_ind]
-  lm1 = get_lm_residuals(y,simple_covs,use_categorical=T,max_num_classes=20,feature_is_numeric=feature_is_numeric)
-  plot(y[names(lm1[[1]]$residuals)],lm1[[1]]$residuals,ylab="Residual",xlab="Fitness score")
-  fitness_vs_covs_lm_objects[[currname]] = lm1
-  save(fitness_vs_covs_lm_objects,file="fitness_analysis_fitness_vs_covs_lm_objects_simple.RData")
-}
-accelerometry_scores_to_residuals = list()
-for (j in 1:ncol(accelerometry_scores)){
-  y = accelerometry_scores[,j]
-  names(y) = rownames(accelerometry_scores)
-  currname = colnames(accelerometry_scores)[j]
-  lm1 = get_lm_residuals(y,simple_covs,use_categorical=T,max_num_classes=20,feature_is_numeric=feature_is_numeric)
-  plot(y[names(lm1[[1]]$residuals)],lm1[[1]]$residuals,ylab="Residual",xlab="Fitness score")
-  accelerometry_scores_to_residuals[[currname]] = lm1[[1]]$residuals
-  save(accelerometry_scores_to_residuals,file="accelereometry_analysis_score_vs_covs_residuals_simple.RData")
-}
-# TBD
-additional_scores_residuals = list(){}
-
-# Plot for the report: Figure S2.2 
-load("fitness_analysis_fitness_vs_covs_lm_objects_simple.RData")
-par(mfrow=c(2,2))
-r2_scores = sapply(fitness_vs_covs_lm_objects,function(x)summary(x$lm)[["r.squared"]])
-r2_scores = format(r2_scores,digits=2)
-for (fitness_score_ind in 1:ncol(fitness_scores_matrix)){
-  y = fitness_scores_matrix[,fitness_score_ind]
-  currname = colnames(fitness_scores_matrix)[fitness_score_ind]
-  lm1 = fitness_vs_covs_lm_objects[[currname]]
-  plot(y[names(lm1[[1]]$residuals)],lm1[[1]]$residuals,ylab="Residual",xlab="Fitness score",
-       main=paste(currname,", R^2=",r2_scores[fitness_score_ind],sep=""))
 }
 
 

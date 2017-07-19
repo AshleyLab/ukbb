@@ -46,18 +46,7 @@ features_to_exclude_manual_analysis = unname(sapply(features_to_exclude_manual_a
 ################# Phenotypes ##################
 ###############################################
 ###############################################
-extract_feature_cols_by_category<-function(cols,cols2names,names2cats,category){
-  curr_features = c()
-  for(nn in cols){
-    curr_name = cols2names[nn]
-    curr_cat = names2cats[curr_name]
-    if(is.na(curr_cat)){next}
-    if(curr_cat==category){
-      curr_features = c(curr_features,nn)
-    }
-  }
-  return(curr_features)
-}
+
 additional_scores = list()
 spiro_cols = extract_feature_cols_by_category(colnames(pheno_data),feature_code2name,feature_subcategory_data,"Spirometry")
 additional_scores[['Spirometry']] = pheno_data[,spiro_cols]
@@ -70,9 +59,7 @@ pulse_rate_cols = get_regex_cols(colnames(pheno_data),"pulse rate\\.",ignore.cas
 additional_scores[['Pulse rate']] = pheno_data[,pulse_rate_cols]
 hand_grip_cols = get_regex_cols(colnames(pheno_data),"Hand grip",ignore.case=T)
 additional_scores[['hand grip']] = pheno_data[,hand_grip_cols]
-status_cols = get_regex_cols(colnames(pheno_data),"status of test")
-additional_scores[['exercise_test_status']] = pheno_data[,status_cols]
-save(additional_scores,file = "metadata_analysis_additional_scores")
+save(additional_scores,file = "metadata_analysis_additional_scores.RData")
 gc()
 
 # For each additional score: simplify, dummy vars, impute, and run PCA
@@ -111,16 +98,7 @@ for(nn in names(additional_scores)){
   colnames(pcs) = paste(nn,"_PC",1:ncol(pcs),sep="")
   additional_scores_pcs[[nn]] = list(pcs=pcs,initial_pca_success=initial_pca_success)
 }
-save(additional_scores,additional_scores_pcs,file = "metadata_analysis_additional_scores")
-
-v = as.character(additional_scores_pcs[["exercise_test_status"]])
-names(v) = names(additional_scores_pcs[["exercise_test_status"]])
-v[v=="Fully completed"] = "1"
-v[v!="1"] = "0"
-v = as.numeric(v)
-table(v)
-additional_scores_pcs[["exercise_test_status"]] = v
-save(additional_scores,additional_scores_pcs,file = "metadata_analysis_additional_scores")
+save(additional_scores,additional_scores_pcs,file = "metadata_analysis_additional_scores.RData")
 
 ###############################################
 #################### End ######################
@@ -133,7 +111,7 @@ save(additional_scores,additional_scores_pcs,file = "metadata_analysis_additiona
 ###############################################
 ###############################################
 
-load("metadata_analysis_additional_scores")
+load("metadata_analysis_additional_scores.RData")
 
 # Define the sample set to work with: union of the above
 subject_set = sapply(additional_scores_pcs,function(x)rownames(x[[1]]))
@@ -260,7 +238,7 @@ for(j in 1:ncol(covariate_matrix)){
 table(feature_is_numeric)
 table(num_categories)
 names(feature_is_numeric) = colnames(covariate_matrix)
-save(covariate_matrix,feature_is_numeric,file="covariate_matrix.RData")
+#save(covariate_matrix,feature_is_numeric,file="covariate_matrix.RData")
 rm(pheno_data,new_pheno_dat)
 gc()
 

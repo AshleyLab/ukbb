@@ -399,6 +399,18 @@ merge_columns_by_their_features<-function(pheno_data,pheno_data_feature2name,...
   return(new_pheno_dat)
 }
 
+extract_feature_cols_by_category<-function(cols,cols2names,names2cats,category){
+  curr_features = c()
+  for(nn in cols){
+    curr_name = cols2names[nn]
+    curr_cat = names2cats[curr_name]
+    if(is.na(curr_cat)){next}
+    if(curr_cat==category){
+      curr_features = c(curr_features,nn)
+    }
+  }
+  return(curr_features)
+}
 
 
 

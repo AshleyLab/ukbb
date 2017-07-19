@@ -121,6 +121,7 @@ scores_mat_simp = merge_scores_list_into_matrix(scores)
 colnames(scores_mat_simp) = paste(colnames(scores_mat_simp),"_simple",sep='')
 
 final_mat = cbind(scores_mat_simp,scores_mat_consv)
+dim(final_mat)
 save(final_mat,file="additional_scores_for_GWAS.RData")
 
 ###############################################
@@ -128,3 +129,14 @@ save(final_mat,file="additional_scores_for_GWAS.RData")
 #################### End ######################
 ###############################################
 ###############################################
+
+###############################################
+###############################################
+################ Some plots ###################
+###############################################
+###############################################
+
+library(corrplot)
+corrs = get_pairwise_corrs(final_mat)
+corrplot(corrs,order='hclust')
+
