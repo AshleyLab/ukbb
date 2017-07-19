@@ -150,6 +150,7 @@ get_lm_residuals<-function(y,covs,use_categorical=T,max_num_classes=5, max_allow
   
   if(use_categorical && sum(!feature_is_numeric[colnames(covs)])>0){
     x2 = covs[,!feature_is_numeric[colnames(covs)]]
+    if(is.null(dim(x2))){x2=matrix(x2,ncol=1);colnames(x2)=colnames(covs[!feature_is_numeric[colnames(covs)]])}
     new_x2 = c()
     for (j in 1:ncol(x2)){
       fx = x2[,j]

@@ -113,6 +113,15 @@ for(nn in names(additional_scores)){
 }
 save(additional_scores,additional_scores_pcs,file = "metadata_analysis_additional_scores")
 
+v = as.character(additional_scores_pcs[["exercise_test_status"]])
+names(v) = names(additional_scores_pcs[["exercise_test_status"]])
+v[v=="Fully completed"] = "1"
+v[v!="1"] = "0"
+v = as.numeric(v)
+table(v)
+additional_scores_pcs[["exercise_test_status"]] = v
+save(additional_scores,additional_scores_pcs,file = "metadata_analysis_additional_scores")
+
 ###############################################
 #################### End ######################
 ###############################################
@@ -124,8 +133,12 @@ save(additional_scores,additional_scores_pcs,file = "metadata_analysis_additiona
 ###############################################
 ###############################################
 
+load("metadata_analysis_additional_scores")
+
 # Define the sample set to work with: union of the above
-subject_set = unique(unlist(sapply(additional_scores,rownames)))
+subject_set = sapply(additional_scores_pcs,function(x)rownames(x[[1]]))
+subject_set = unlist(subject_set)
+subject_set = unique(subject_set)
 
 # Filter 1: Define data column types to be excluded automatically
 categories_to_exclude = c("Cognitive function")
@@ -251,46 +264,6 @@ save(covariate_matrix,feature_is_numeric,file="covariate_matrix.RData")
 rm(pheno_data,new_pheno_dat)
 gc()
 
-# Check that sex, age, height, weight are there
-get_regex_cols(colnames(covariate_matrix),"age",ignore.case=T)
-get_regex_cols(colnames(covariate_matrix),"sex",ignore.case=T)
-get_regex_cols(colnames(covariate_matrix),"height",ignore.case=T)
-get_regex_cols(colnames(covariate_matrix),"weight",ignore.case=T)
-get_regex_cols(colnames(covariate_matrix),"bmi",ignore.case=T)
-tmp_feature = get_regex_cols(colnames(covariate_matrix),"smok",ignore.case=T)[2]
-
-# # 1.1 SText 2 (The data)
-# # map to pheno_data and look at the raw features vs the computed ones
-# tmp_feature = get_regex_cols(colnames(covariate_matrix),"smok",ignore.case=T)[2]
-# tmp_raw_features = names(which(feature_code2name == tmp_feature))
-# feature_subcategory_data[tmp_feature]
-# tmp_raw_is_num = !all(is.na(pheno_data[,tmp_raw_features[1]]))
-# tmp_raw_non_na_sets = apply(!is.na(pheno_data[,tmp_raw_features]),2,which)
-# sapply(tmp_raw_non_na_sets,length)
-# covered_samples = unique(unlist(tmp_raw_non_na_sets))
-# length(covered_samples)
-# raw_feature_tables = apply(pheno_data[,tmp_raw_features],2,table)
-# rowSums(raw_feature_tables)
-# # Look at different merging options
-# merged_col1 = merge_feature_columns(pheno_data[,tmp_raw_features])
-# table(merged_col1)
-# merged_col2 = merge_feature_columns(pheno_data[,tmp_raw_features],take_first=F)
-# table(merged_col2)
-# merged_col3 = apply(pheno_data[,tmp_raw_features],1,max,na.rm=T)
-# table(merged_col3)
-# merged_col4 = apply(pheno_data[,tmp_raw_features],1,min,na.rm=T)
-# table(merged_col4)
-# merged_col5 = apply(pheno_data[,tmp_raw_features],1,mean,na.rm=T)
-# table(merged_col5)
-# ###
-# # check consistency:
-# inter1 = intersect(tmp_raw_na_sets[[1]],tmp_raw_na_sets[[2]])
-# inter1_matrix = pheno_data[inter1,tmp_raw_features[1:2]]
-# table(apply(inter1_matrix,1,function(x)(all(x==x[1]))))
-# length(intersect(tmp_raw_na_sets[[1]],tmp_raw_na_sets[[3]]))
-# computed_tmp_feature = covariate_matrix[,tmp_feature[5]]
-
-
 ###############################################
 ###############################################
 #################### End ######################
@@ -303,80 +276,39 @@ tmp_feature = get_regex_cols(colnames(covariate_matrix),"smok",ignore.case=T)[2]
 ###############################################
 ###############################################
 
-# Conservative analysis
-fitness_vs_covs_lm_objects = list()
-for (fitness_score_ind in 1:ncol(fitness_scores_matrix)){
-  y = fitness_scores_matrix[,fitness_score_ind]
-  currname = colnames(fitness_scores_matrix)[fitness_score_ind]
-  lm1 = get_lm_residuals(y,covariate_matrix,use_categorical=T,max_num_classes=20,feature_is_numeric=feature_is_numeric)
-  plot(y[names(lm1[[1]]$residuals)],lm1[[1]]$residuals,ylab="Residual",xlab="Fitness score")
-  fitness_vs_covs_lm_objects[[currname]] = lm1
-  save(fitness_vs_covs_lm_objects,file="fitness_analysis_fitness_vs_covs_lm_objects.RData")
-}
-r2_scores = sapply(fitness_vs_covs_lm_objects,function(x)summary(x$lm)[["r.squared"]])
-
-# Plot for the report: Figure S2.2 
-par(mfrow=c(2,2))
-r2_scores = sapply(fitness_vs_covs_lm_objects,function(x)summary(x$lm)[["r.squared"]])
-r2_scores = format(r2_scores,digits=2)
-for (fitness_score_ind in 1:ncol(fitness_scores_matrix)){
-  y = fitness_scores_matrix[,fitness_score_ind]
-  currname = colnames(fitness_scores_matrix)[fitness_score_ind]
-  lm1 = fitness_vs_covs_lm_objects[[currname]]
-  plot(y[names(lm1[[1]]$residuals)],lm1[[1]]$residuals,ylab="Residual",xlab="Fitness score",
-       main=paste(currname,", R^2=",r2_scores[fitness_score_ind],sep=""))
-}
-
-accelerometry_scores_to_residuals = list()
-for (j in 1:ncol(accelerometry_scores)){
-  y = accelerometry_scores[,j]
-  names(y) = rownames(accelerometry_scores)
-  currname = colnames(accelerometry_scores)[j]
-  lm1 = get_lm_residuals(y,covariate_matrix,use_categorical=T,max_num_classes=20,feature_is_numeric=feature_is_numeric)
-  plot(y[names(lm1[[1]]$residuals)],lm1[[1]]$residuals,ylab="Residual",xlab="Fitness score")
-  accelerometry_scores_to_residuals[[currname]] = lm1[[1]]$residuals
-  save(accelerometry_scores_to_residuals,file="accelereometry_analysis_score_vs_covs_residuals_conservative.RData")
-}
-# TBD
-additional_scores_residuals = list(){}
-
 # Simple analysis
-simple_covs = covariate_matrix[,c("Sex","Age when attended assessment centre","Body mass index (BMI)","BMI","Standing height")]
-fitness_vs_covs_lm_objects = list()
-for (fitness_score_ind in 1:ncol(fitness_scores_matrix)){
-  y = fitness_scores_matrix[,fitness_score_ind]
-  currname = colnames(fitness_scores_matrix)[fitness_score_ind]
-  lm1 = get_lm_residuals(y,simple_covs,use_categorical=T,max_num_classes=20,feature_is_numeric=feature_is_numeric)
+simple_covs = covariate_matrix[,c("Sex","Age when attended assessment centre","Body mass index (BMI)","Standing height")]
+simple_covs[,1] = 2-as.numeric(as.factor(simple_covs[,1]))
+table(simple_covs[,1] )
+additional_scores_vs_covs_lm_objects = list()
+for (ind in 1:length(additional_scores_pcs)){
+  if(is.null(dim(additional_scores_pcs[[ind]][[1]]))){
+    y = additional_scores_pcs[[ind]]
+  }
+  else{
+    y = additional_scores_pcs[[ind]][[1]][,1]
+  }
+  currname = names(additional_scores_pcs)[ind]
+  lm1 = get_lm_residuals(y,simple_covs,use_categorical=F,feature_is_numeric=feature_is_numeric)
   plot(y[names(lm1[[1]]$residuals)],lm1[[1]]$residuals,ylab="Residual",xlab="Fitness score")
-  fitness_vs_covs_lm_objects[[currname]] = lm1
-  save(fitness_vs_covs_lm_objects,file="fitness_analysis_fitness_vs_covs_lm_objects_simple.RData")
+  additional_scores_vs_covs_lm_objects[[currname]] = lm1[[1]]$residuals
+  save(additional_scores_vs_covs_lm_objects,file="additional_scores_vs_covs_lm_objects_vs_covs_lm_objects_simple.RData")
+  gc()
 }
-accelerometry_scores_to_residuals = list()
-for (j in 1:ncol(accelerometry_scores)){
-  y = accelerometry_scores[,j]
-  names(y) = rownames(accelerometry_scores)
-  currname = colnames(accelerometry_scores)[j]
-  lm1 = get_lm_residuals(y,simple_covs,use_categorical=T,max_num_classes=20,feature_is_numeric=feature_is_numeric)
+
+# Conservative analysis
+additional_scores_vs_covs_lm_objects = list()
+for (ind in 1:length(additional_scores_pcs)){
+  if(is.null(dim(additional_scores_pcs[[ind]][[1]]))){
+    y = additional_scores_pcs[[ind]]
+  }
+  else{
+    y = additional_scores_pcs[[ind]][[1]][,1]
+  }
+  currname = names(additional_scores_pcs)[ind]
+  lm1 = get_lm_residuals(y,covariate_matrix,use_categorical=T,max_num_classes=20,feature_is_numeric=feature_is_numeric)
   plot(y[names(lm1[[1]]$residuals)],lm1[[1]]$residuals,ylab="Residual",xlab="Fitness score")
-  accelerometry_scores_to_residuals[[currname]] = lm1[[1]]$residuals
-  save(accelerometry_scores_to_residuals,file="accelereometry_analysis_score_vs_covs_residuals_simple.RData")
+  additional_scores_vs_covs_lm_objects[[currname]] = lm1[[1]]$residuals
+  save(additional_scores_vs_covs_lm_objects,file="additional_scores_vs_covs_lm_objects_vs_covs_lm_objects_conservative.RData")
+  gc()
 }
-# TBD
-additional_scores_residuals = list(){}
-
-# Plot for the report: Figure S2.2 
-load("fitness_analysis_fitness_vs_covs_lm_objects_simple.RData")
-par(mfrow=c(2,2))
-r2_scores = sapply(fitness_vs_covs_lm_objects,function(x)summary(x$lm)[["r.squared"]])
-r2_scores = format(r2_scores,digits=2)
-for (fitness_score_ind in 1:ncol(fitness_scores_matrix)){
-  y = fitness_scores_matrix[,fitness_score_ind]
-  currname = colnames(fitness_scores_matrix)[fitness_score_ind]
-  lm1 = fitness_vs_covs_lm_objects[[currname]]
-  plot(y[names(lm1[[1]]$residuals)],lm1[[1]]$residuals,ylab="Residual",xlab="Fitness score",
-       main=paste(currname,", R^2=",r2_scores[fitness_score_ind],sep=""))
-}
-
-
-
-
