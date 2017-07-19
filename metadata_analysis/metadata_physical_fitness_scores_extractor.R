@@ -526,51 +526,6 @@ all(is.na(x1)==is.na(x2))
 ###############################################
 
 
-# Start with generating a comparison of the scores
-# Use category 1 to compare the repeats; HR preds
-x1 = data_slice2fitness_score_objects[["0;Category 1"]]$HR_pred_WD[,2]
-x2 = data_slice2fitness_score_objects[["1;Category 1"]]$HR_pred_WD[,2]
-subjects_in_both = intersect(names(x1),names(x2))
-hist(log(x2));hist(log(x1))
-qqplot(log(x1),log(x2));abline(0,1)
-x1_i = x1[subjects_in_both];x2_i = x2[subjects_in_both]
-plot(x1_i,x2_i);abline(0,1)
-wilcox.test(x1_i,x2_i,paired = T)$p.value
-get_pairwise_corrs(cbind(x1_i,x2_i),method='spearman')
-
-# Use category 1 to compare the repeats; HR preds
-x1 = data_slice2fitness_score_objects[["1;Category 1"]]$HR_pred_WD[,2]
-x2 = data_slice2fitness_score_objects[["0;Category 2"]]$HR_pred_WD[,2]
-subjects_in_both = intersect(names(x1),names(x2))
-hist(log(x2));hist(log(x1))
-qqplot(log(x1),log(x2));abline(0,1)
-x1_i = x1[subjects_in_both];x2_i = x2[subjects_in_both]
-plot(x1_i,x2_i);abline(0,1)
-wilcox.test(x1_i,x2_i,paired = T)$p.value
-get_pairwise_corrs(cbind(x1_i,x2_i),method='spearman')
-
-# Compare the categories within the same repeat
-x1 = data_slice2fitness_score_objects[["0;Category 1"]]$HR_pred_WD[,2]
-x2 = data_slice2fitness_score_objects[["0;Category 2"]]$HR_pred_WD[,2]
-qqplot(log(x1),log(x2));abline(0,1)
-ks.test(x1,x2)
-# Use category 1 to compare the repeats; HR preds
-x1 = data_slice2fitness_score_objects[["1;Category 1"]]$HR_pred_WD[,2]
-x2 = data_slice2fitness_score_objects[["1;Category 2"]]$HR_pred_WD[,2]
-qqplot(log(x1),log(x2));abline(0,1)
-ks.test(x1,x2)
-
-# Use category 1 to compare the repeats; Rest scores
-x1 = data_slice2fitness_score_objects[["0;Category 1"]]$HR_ratios[,2]
-x2 = data_slice2fitness_score_objects[["1;Category 1"]]$HR_ratios[,2]
-subjects_in_both = intersect(names(x1),names(x2))
-hist(log(x2));hist(log(x1))
-qqplot(log(x1),log(x2));abline(0,1)
-x1_i = x1[subjects_in_both];x2_i = x2[subjects_in_both]
-plot(x1_i,x2_i);abline(0,1)
-wilcox.test(x1_i,x2_i,paired = T)$p.value
-get_pairwise_corrs(cbind(x1_i,x2_i),method='spearman')
-
 par(mfrow=c(2,2))
 HR_ratios = lapply(data_slice2fitness_score_objects,function(x)x$HR_ratios[,2])
 HR_ratios_merged = merge_scores_list(HR_ratios,main = "Rest HR ratios after 60sec")
@@ -612,6 +567,9 @@ save(HR_ratios_merged,HR_pred_WDs_merged,
 ##### Supplementary Figures and stats #########
 ###############################################
 ###############################################
+
+load("fitness_analysis_data_slice2fitness_score_objects.RData")
+load("fitness_analysis_data_slice2_quality_scores.RData")
 
 # By sections in the Supplementary test file:
 # 1.1 The data
@@ -752,6 +710,51 @@ plot.design(HR_ratios_merged,main = colnames(fitness_scores_matrix)[1])
 plot.design(HR_pred_WDs_merged,main = colnames(fitness_scores_matrix)[2])
 plot.design(HR_WD_slopes_merged,main = colnames(fitness_scores_matrix)[3])
 plot.design(max_WDs_merged,main = colnames(fitness_scores_matrix)[4])
+
+
+# Figure S1.8 - compare shared subjects across the slices
+slice_pair2somparison = list()
+for (nn1 in names(data_slice2fitness_score_objects)){
+  for(nn2 in names(data_slice2fitness_score_objects)){
+    if(nn1 == nn2){next}
+    curr_name = paste(sort(c(nn1,nn2)),collapse = ",")
+    if(curr_name %in% names(slice_pair2somparison)){next}
+    slice_pair2somparison[[curr_name]] = list()
+    x1 = data_slice2fitness_score_objects[[nn1]]$HR_pred_WD[,2]
+    x2 = data_slice2fitness_score_objects[[nn2]]$HR_pred_WD[,2]
+    subjects_in_both = intersect(names(x1),names(x2))
+    x1_i = x1[subjects_in_both];x2_i = x2[subjects_in_both]
+    slice_pair2somparison[[curr_name]][["HR_pred_100"]] = cbind(x1_i,x2_i)
+    colnames(slice_pair2somparison[[curr_name]][["HR_pred_100"]]) = c(nn1,nn2)
+  }
+}
+get_slices_corrs<-function(x){
+  if(is.null(dim(x$HR_pred_100))){return (NA)}
+  else{return(get_pairwise_corrs(x$HR_pred_100))}
+}
+get_slices_inter_size<-function(x){
+  if(is.null(dim(x$HR_pred_100))){return (NA)}
+  else{
+    m = x$HR_pred_100
+    has_na = apply(is.na(m),1,any)
+    return(sum(!has_na))
+  }
+}
+get_slices_inter_wilcox<-function(x){
+  if(is.null(dim(x$HR_pred_100))){return (NA)}
+  else{
+    m = x$HR_pred_100
+    has_na = apply(is.na(m),1,any)
+    if(sum(!has_na)<5){return(NA)}
+    x1 = m[!has_na,1];x2=m[!has_na,2]
+    return(wilcox.test(x1,x2,paired=T)$p.value)
+  }
+}
+correls = sapply(slice_pair2somparison,function(x)get_slices_corrs(x)[1,2])
+sizes = sapply(slice_pair2somparison,get_slices_inter_size)
+pvals = sapply(slice_pair2somparison,get_slices_inter_wilcox)
+tmp_obj = slice_pair2somparison[["0;Category 1,1;Category 1"]]$HR_pred_100
+plot(x=tmp_obj[,1],y=tmp_obj[,2],xlab=colnames(tmp_obj)[1],ylab=colnames(tmp_obj)[2]);abline(0,1)
 
 ###############################################
 ###############################################

@@ -286,7 +286,7 @@ get_rest_phase_fitness_score<-function(rest_data,rho_rest,rest_time = 60,
 }
 
 # A function that merges the results of the fitness scores computation
-merge_scores_list<-function(l,plot_class_averages = T,...){
+merge_scores_set<-function(l,plot_class_averages = T,...){
   all_subjects = c()
   for(x in l){
     all_subjects = union(all_subjects,names(x))
@@ -314,4 +314,90 @@ merge_scores_list<-function(l,plot_class_averages = T,...){
   if(plot_class_averages){plot.design(d,...)}
   return(d)
 }
+
+get_pcs_for_score_set<-function(scores,max_allowed_na_per=0.2,max_num_classes=10,num_pcs=1){
+  x = scores
+  if(is.null(dim(x))){return(scores)}
+  feature_is_numeric = apply(scores,2,function(x)!all(is.na(as.numeric(x))))
+  x1 = as.matrix(x[,feature_is_numeric])
+  mode(x1) = 'numeric'
+  x2 = as.matrix(x[,!feature_is_numeric])
+  print ("Imputing missing values in numeric part")
+  if(any(is.na(mat))){
+    x_imp = impute.knn(x1)$data
+  }
+  else{
+    x_imp = x1
+  }
+  print ("Done imputing missing values in numeric part")
+  # if(sum(!feature_is_numeric)>0){
+  #   new_x2 = c()
+  #   for (j in 1:ncol(x2)){
+  #     fx = x2[,j]
+  #     fx_table = table(as.character(fx))
+  #     if(sum(is.na(fx))/length(fx) >= max_allowed_na_per){next}    
+  #     if(length(fx_table)>max_num_classes || length(fx_table)<2){next}
+  #     if(!is.factor(fx)){fx = as.factor(fx)}
+  #     options(na.action='na.pass')
+  #     fx_mat = model.matrix(~fx+0,data=data.frame(fx))
+  #     colnames(fx_mat) = gsub(colnames(fx_mat),pattern="^fx",perl=T,replace="")
+  #     colnames(fx_mat) = paste(colnames(x2)[j],colnames(fx_mat),sep='_')
+  #     fx_mat = fx_mat[,apply(fx_mat,2,sd,na.rm=T)>0]
+  #     if(length(fx_mat)==0){next}
+  #     new_x2 = cbind(new_x2,fx_mat)
+  #   }
+  #   x2_imp = impute.knn(new_x2)$data
+  #   print("Done creating the discrete covariate matrix for the regression analysis")
+  #   print(dim(x2_imp))
+  #   x_imp = cbind(x_imp,x2_imp)
+  # }
+  print("Done creating the covariate matrix for the regression analysis")
+  print(dim(x_imp))
+  pca_obj = prcomp(x_imp,retx = T)
+  plot(pca_obj)
+  return(pca_obj$x[,1:num_pcs])
+}
+
+merge_feature_columns<-function(curr_cols,take_first=F){
+  v = curr_cols[,1]
+  for(j in 2:ncol(curr_cols)){
+    if(take_first){
+      curr_NAs = is.na(v)
+      v[curr_NAs] = curr_cols[curr_NAs,j]
+    }
+    else{
+      curr_non_NAs = !is.na(curr_cols[,j])
+      v[curr_non_NAs] = curr_cols[curr_non_NAs,j]
+    }
+  }
+  return (v)
+}
+
+merge_columns_by_their_features<-function(pheno_data,pheno_data_feature2name,...){
+  new_pheno_dat = data.frame(subjnames = rownames(pheno_data))
+  for(nn in unique(pheno_data_feature2name)){
+    curr_cols = pheno_data[,pheno_data_feature2name == nn]
+    if(sum(pheno_data_feature2name == nn)==1){
+      v = data.frame(nn = curr_cols)
+    }
+    else{
+      v = data.frame(nn = merge_feature_columns(curr_cols),...)
+    }
+    new_pheno_dat = cbind(new_pheno_dat,v)
+    colnames(new_pheno_dat)[ncol(new_pheno_dat)] = nn
+  }
+  if(ncol(new_pheno_dat)>2){
+    rownames(new_pheno_dat) = new_pheno_dat[,1]
+    new_pheno_dat = new_pheno_dat[,-1]
+  }
+  else{
+    v = new_pheno_dat[,2]
+    names(v) = new_pheno_dat[,1]
+    return (v)
+  }
+  return(new_pheno_dat)
+}
+
+
+
 
