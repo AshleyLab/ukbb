@@ -331,35 +331,6 @@ for (j in 1:ncol(accelerometry_scores)){
   save(accelerometry_scores_to_residuals,file="accelereometry_analysis_score_vs_covs_residuals_conservative.RData")
 }
 
-
-# Load the genetic PCA data and print the tables for the GWAS
-# TODO:
-# 1. Discretize?
-# 2. What to do with NAs?
-genetic_pca_data_path = "plink/may16.eigenvec"
-genetic_pca_data = read.delim(genetic_pca_data_path,sep=" ",header = F)
-dim(genetic_pca_data)
-gwas_data_samples = as.character(genetic_pca_data[,2])
-gwas_data_pcs = genetic_pca_data[,3:4]
-colnames(gwas_data_pcs) = paste("PC",1:ncol(gwas_data_pcs),sep="")
-gwas_data_residuals = c()
-# this vector specifies the direction of the scores - whether higher is 
-# better fitness or not
-for(nn in names(fitness_vs_covs_lm_objects)){
-  lm_obj = fitness_vs_covs_lm_objects[[nn]][[1]]
-  curr_res = lm_obj$residuals
-  curr_res = curr_res[gwas_data_samples]
-  names(curr_res) = gwas_data_samples
-  NA_samples = gwas_data_samples[is.na(curr_res)]
-  gwas_data_residuals = cbind(gwas_data_residuals,curr_res)
-}
-colnames(gwas_data_residuals) = paste("Residuals_",names(fitness_vs_covs_lm_objects),sep="")
-colnames(gwas_data_residuals) = gsub(colnames(gwas_data_residuals),pattern=" ",replace="_")
-gwas_data = cbind(gwas_data_residuals,as.matrix(gwas_data_pcs))
-get_pairwise_corrs(gwas_data)
-save(gwas_data,file="June14_2017_gwas_data_table.RData")
-write.table(gwas_data,file = "June14_2017_fitness_scores_gwas_data_table.txt",sep="\t",quote=F)
-
 ###############################################
 ###############################################
 #################### End ######################
@@ -538,7 +509,6 @@ summary_table[which(y1>150 & x1<10),1]
 summary_table[which(y1==200 & x1==200),1]
 plot(x=summary_table[,"MI-discretized"],y=summary_table[,"MI-NA fitness"],
      main="Predicted HR: mutual information",xlab="MI vs. scores",ylab="MI vs. NAs",pch=4,lwd=1.5,xlim=c(0,0.2),ylim=c(0,0.2));abline(0,1)
-
 
 # Compare our results to VERSION 1
 load("UKBB_phenotypic_data_for_GWAS.RData")

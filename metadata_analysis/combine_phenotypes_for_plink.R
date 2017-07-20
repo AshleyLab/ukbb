@@ -3,6 +3,8 @@
 try({setwd("/Users/davidhsu/Documents/ukbb")})
 try({setwd("/Users/david/Desktop/ukbb/")})
 try({setwd('/scratch/PI/euan/projects/ukbb/da_dh/')})
+source("auxiliary_functions.R")
+library(corrplot)
 
 ###############################################
 ###############################################
@@ -63,6 +65,9 @@ scores_mat_simp = merge_scores_list_into_matrix(scores)
 colnames(scores_mat_simp) = paste(colnames(scores_mat_simp),"_simple",sep='')
 
 final_mat = cbind(scores_mat_simp,scores_mat_consv)
+print(dim(final_mat))
+corrs = get_pairwise_corrs(final_mat)
+corrplot(corrs,order='hclust')
 save(final_mat,file="physical_fitness_scores_for_GWAS.RData")
 
 ###############################################
@@ -92,6 +97,9 @@ scores_mat_simp = merge_scores_list_into_matrix(scores)
 colnames(scores_mat_simp) = paste(colnames(scores_mat_simp),"_simple",sep='')
 
 final_mat = cbind(scores_mat_simp,scores_mat_consv)
+print(dim(final_mat))
+corrs = get_pairwise_corrs(final_mat[,1:20])
+corrplot(corrs,order='hclust')
 save(final_mat,file="physical_activity_scores_for_GWAS.RData")
 
 ###############################################
@@ -121,7 +129,9 @@ scores_mat_simp = merge_scores_list_into_matrix(scores)
 colnames(scores_mat_simp) = paste(colnames(scores_mat_simp),"_simple",sep='')
 
 final_mat = cbind(scores_mat_simp,scores_mat_consv)
-dim(final_mat)
+print(dim(final_mat))
+corrs = get_pairwise_corrs(final_mat)
+corrplot(corrs,order='hclust')
 save(final_mat,file="additional_scores_for_GWAS.RData")
 
 ###############################################
@@ -139,4 +149,50 @@ save(final_mat,file="additional_scores_for_GWAS.RData")
 library(corrplot)
 corrs = get_pairwise_corrs(final_mat)
 corrplot(corrs,order='hclust')
+
+###############################################
+###############################################
+#################### End ######################
+###############################################
+###############################################
+
+###############################################
+###############################################
+############## Correct PCs ####################
+###############################################
+###############################################
+source("auxiliary_functions.R")
+scores_matrix = get(load("physical_fitness_scores_for_GWAS.RData"))
+
+# Load the genetic PCA data and print the tables for the GWAS
+# TODO:
+# 1. Discretize?
+# 2. What to do with NAs?
+genetic_pca_data_path = "plink/may16.eigenvec"
+genetic_pca_data = read.delim(genetic_pca_data_path,sep=" ",header = F)
+dim(genetic_pca_data)
+gwas_data_samples = as.character(genetic_pca_data[,2])
+gwas_data_pcs = genetic_pca_data[,3:4]
+colnames(gwas_data_pcs) = paste("PC",1:ncol(gwas_data_pcs),sep="")
+gwas_data_residuals = c()
+# Correct for the PCs
+for(nn in colnames(scores_matrix)){
+  curr_res = scores_matrix[,nn]
+  curr_res = curr_res[gwas_data_samples]
+  names(curr_res) = gwas_data_samples
+  NA_samples = gwas_data_samples[is.na(curr_res)]
+  gwas_data_residuals = cbind(gwas_data_residuals,curr_res)
+}
+colnames(gwas_data_residuals) = paste("Residuals_",colnames(scores_matrix),sep="")
+colnames(gwas_data_residuals) = gsub(colnames(gwas_data_residuals),pattern=" ",replace="_")
+gwas_data = cbind(gwas_data_residuals,as.matrix(gwas_data_pcs))
+corrs = get_pairwise_corrs(gwas_data)
+save(gwas_data,file="July19_2017_gwas_data_table.RData")
+write.table(gwas_data,file = "July19_2017_fitness_scores_gwas_data_table.txt",sep="\t",quote=F)
+library(corrplot)
+corrplot(corrs,order='hclust')
+
+
+
+
 
