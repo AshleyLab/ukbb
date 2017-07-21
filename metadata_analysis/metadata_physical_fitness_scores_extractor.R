@@ -85,8 +85,7 @@ for (REPEAT in REPEATS){
     regr_inputs = list()
     for (j in 1:length(tps_vs_wkls)){
       if(j%%500 ==0){print(j)}
-      curr_input =  tps_vs_wkls[[j]]
-      curr_subj = names(tps_vs_wkls)[j]
+      curr_input =  tps_vs_wkls[[j]];curr_subj = names(tps_vs_wkls)[j]
       regr_inputs[[curr_subj]] = extract_regression_input_from_tp_and_wklds(curr_input)
     }
     
@@ -128,19 +127,17 @@ save(preprocessed_data_slices,file="fitness_analysis_preprocessed_data_slices.RD
 ###############################################
 
 # Use the main slice
-curr_slice_name = "0;Category 1"
-pheno_data = preprocessed_data_slices[[curr_slice_name]][["pheno_data"]]
-regex_matrices = preprocessed_data_slices[[curr_slice_name]][["regex_matrices"]]
-tps_vs_wkls = preprocessed_data_slices[[curr_slice_name]][["tps_vs_wkls"]]
-regr_inputs = preprocessed_data_slices[[curr_slice_name]][["regr_inputs"]]
-subject2test_status = preprocessed_data_slices[[curr_slice_name]][["subject2test_status"]]
-subject2sex = preprocessed_data_slices[[curr_slice_name]][["subject2sex"]]
-
-rand_ind = sample(1:nrow(regex_matrices[["time"]]))[1]
-plot(regex_matrices[["time"]][rand_ind,],regex_matrices[["workload"]][rand_ind,])
-plot(regex_matrices[["time"]][rand_ind,1:112],regex_matrices[["heartrate"]][rand_ind,])
+# curr_slice_name = "0;Category 1"
+# pheno_data = preprocessed_data_slices[[curr_slice_name]][["pheno_data"]]
+# regex_matrices = preprocessed_data_slices[[curr_slice_name]][["regex_matrices"]]
+# tps_vs_wkls = preprocessed_data_slices[[curr_slice_name]][["tps_vs_wkls"]]
+# regr_inputs = preprocessed_data_slices[[curr_slice_name]][["regr_inputs"]]
+# subject2test_status = preprocessed_data_slices[[curr_slice_name]][["subject2test_status"]]
+# subject2sex = preprocessed_data_slices[[curr_slice_name]][["subject2sex"]]
+# rand_ind = sample(1:nrow(regex_matrices[["time"]]))[1]
+# plot(regex_matrices[["time"]][rand_ind,],regex_matrices[["workload"]][rand_ind,])
+# plot(regex_matrices[["time"]][rand_ind,1:112],regex_matrices[["heartrate"]][rand_ind,])
 #table(c(regex_matrices[["phase"]]))
-
 # # TODO: check the MANUAL annotation, what does it mean?
 # is_MANUAL_phase = regex_matrices[["phase"]] == "MANUAL"
 # subjects_with_MANUAL = rowSums(is_MANUAL_phase,na.rm=T) > 0
@@ -148,17 +145,17 @@ plot(regex_matrices[["time"]][rand_ind,1:112],regex_matrices[["heartrate"]][rand
 # table(rowSums(is_MANUAL_phase,na.rm=T))
 # table(colSums(is_MANUAL_phase,na.rm=T))
 # ########################################################
-# Analyze the phases
-# We transform the phases into numbers separated by a 1000:
-# makes the plotting easier.
-numeric_phase_mat = regex_matrices[["phase"]]
-numeric_phase_mat[numeric_phase_mat == "Pretest"] = "0"
-numeric_phase_mat[numeric_phase_mat == "Exercise"] = "1"
-# Rethink what to do with MANUAL after the TODO above is completed
-numeric_phase_mat[numeric_phase_mat == "MANUAL"] = "1"
-numeric_phase_mat[numeric_phase_mat=="Rest"] = "2"
-mode(numeric_phase_mat) = "numeric"
-
+# # Analyze the phases
+# # We transform the phases into numbers separated by a 1000:
+# # makes the plotting easier.
+# numeric_phase_mat = regex_matrices[["phase"]]
+# numeric_phase_mat[numeric_phase_mat == "Pretest"] = "0"
+# numeric_phase_mat[numeric_phase_mat == "Exercise"] = "1"
+# # Rethink what to do with MANUAL after the TODO above is completed
+# numeric_phase_mat[numeric_phase_mat == "MANUAL"] = "1"
+# numeric_phase_mat[numeric_phase_mat=="Rest"] = "2"
+# mode(numeric_phase_mat) = "numeric"
+#
 # # This test: We wanted see that the last time point at each stage makes sense
 # # compared to the explanation of UKBB.
 # num_phases = 0:2
@@ -177,16 +174,6 @@ mode(numeric_phase_mat) = "numeric"
 #   table(as.numeric(subj2last_timepoint))
 #   break
 # }
-
-# Visualize the experiment of a random subject
-rand_ind = sample(1:nrow(regex_matrices[["time"]]))[1]
-numeric_timepoints = regex_matrices[["time"]]
-mode(numeric_timepoints) = "numeric"
-new_time_order = numeric_phase_mat*1000 + numeric_timepoints
-plot(new_time_order[rand_ind,],regex_matrices[["workload"]][rand_ind,],
-     xlab = "Time (seconds within phases)", ylab="Workload")
-#plot(regex_matrices[["heartrate"]][rand_ind,],regex_matrices[["workload"]][rand_ind,1:112])
-
 # Some basic tests for the tps_vs_wkls object
 # table(sapply(tps_vs_wkls,class))
 # table(sapply(tps_vs_wkls,function(x)class(x)=="list"&&x$is_mono)) / length(tps_vs_wkls)
@@ -311,48 +298,6 @@ save(data_slice2_quality_scores,file="fitness_analysis_data_slice2_quality_score
 ###############################################
 ###############################################
 
-curr_slice_name = "0;Category 1";slice_name = "0;Category 1"
-lm_inputs = preprocessed_data_slices[[slice_name]]$regr_inputs
-subject2test_status = preprocessed_data_slices[[slice_name]]$subject2test_status[names(lm_inputs)]
-subject2sex = preprocessed_data_slices[[slice_name]]$subject2sex[names(lm_inputs)]
-pheno_data = preprocessed_data_slices[[slice_name]]$pheno_data
-regex_matrices = preprocessed_data_slices[[slice_name]]$regex_matrices
-rho_exercise = data_slice2_quality_scores[[slice_name]][["rho_exercise"]] 
-wsize_exercise = data_slice2_quality_scores[[slice_name]][["wsize_exercise"]]
-rho_rest = data_slice2_quality_scores[[slice_name]][["rho_rest"]]
-wsize_rest = data_slice2_quality_scores[[slice_name]][["wsize_rest"]]
-subject_technical_class = data_slice2_quality_scores[[slice_name]][["subject_technical_class"]]
-max_WD_pheno_data = data_slice2_quality_scores[[slice_name]][["max_WD_pheno_data"]]
-max_WDs = data_slice2_quality_scores[[slice_name]][["max_WDs"]]
-
-# The code duplication below is needed because we do not keep all objects from the 
-# previous section
-# Preprocessing: we use the subject status, window size, mean/max HR and mean/max WD
-sizes = sapply(lm_inputs,function(x)length(x$HR))
-# The warnings we get from the commands below are due to subjects with no data
-mean_HRs = sapply(lm_inputs,function(x)mean(x$HR))
-max_HRs = sapply(lm_inputs,function(x)max(x$HR))
-sd_HRs = sapply(lm_inputs,function(x)sd(x$HR))
-mean_WDs = sapply(lm_inputs,function(x)mean(x$WD))
-
-# Get some boxplots to show statistics based on completion status
-# We differentiate between subjects that completed the exercise stage
-# and had a relatively large window size (of increasing WLDs) and those
-# with a small one (<10). 
-par(mfrow=c(2,3),mar=c(4,4,4,4))
-# Warning in the commands below are due to subjects with no data, ignore
-boxplot(get_list_by_values(sizes,subject_technical_class),las=2,ylab="window size")
-boxplot(get_list_by_values(mean_WDs,subject_technical_class),las=2,ylab = "mean workload")
-boxplot(get_list_by_values(max_WDs,subject_technical_class),las=2,ylab="max workload")
-boxplot(get_list_by_values(mean_HRs,subject_technical_class),las=2,ylab="mean heart rate")
-boxplot(get_list_by_values(max_HRs,subject_technical_class),las=2,ylab="max heart rate")
-boxplot(get_list_by_values(sd_HRs,subject_technical_class),las=2,ylab="heart rate sd")
-# Conclusions:
-# Subjects that did not complete the tests (most likely have) low fitness.
-# Subject that completed the test and had very few WDs are more similar to the 
-# uncompleted cases than to the other completed cases.
-# Changing the window size threshold for 15 eliminates the separation between the completed
-# cases in terms of hear rates (mean, max).
 
 # # Subject classes vs. sex
 # tbl = table(subject_technical_class,subject2sex[names(subject_technical_class)])
@@ -370,57 +315,56 @@ boxplot(get_list_by_values(sd_HRs,subject_technical_class),las=2,ylab="heart rat
 # boxplot(l,ylab="Rho",main="Rest",las=2)
 # qqplot(l[[1]],l[[3]],xlab=names(l)[1],ylab=names(l)[3],cex=1.3,col="grey",pch=20,main="Rest rho");abline(0,1,lty=2,lwd=2)
 
-# Compare the R-sq scores of different regression analyses
-r2_values = c()
-for(i in names(lm_inputs)){
-  if(is.null(lm_inputs[[i]])){next}
-  WD = lm_inputs[[i]]$WD; HR = lm_inputs[[i]]$HR
-  TP = lm_inputs[[i]]$TP
-  if(length(WD)<3){
-    r2_values = rbind(r2_values,c(NA,NA,NA))
-    rownames(r2_values)[nrow(r2_values)] = i
-    next
-  }
-  obj1 = lm(HR~WD); obj2 = lm(HR~TP); obj3 = lm(HR~TP+WD)
-  r2_values = rbind(r2_values,c(get_lm_r2(obj1),get_lm_r2(obj2),get_lm_r2(obj2)))
-  rownames(r2_values)[nrow(r2_values)] = i
-  if(as.numeric(i)%%1000==0){print(i)}
-}
-
-# Compute  the autocorrelations of the heart rates
-autocorrs = c()
-for(i in names(lm_inputs)){
-  if(is.null(lm_inputs[[i]])){next}
-  WD = lm_inputs[[i]]$WD; HR = lm_inputs[[i]]$HR
-  TP = lm_inputs[[i]]$TP
-  if(length(WD) < 5){
-    autocorrs = rbind(autocorrs,c(NA,NA,NA))
-    rownames(autocorrs)[nrow(autocorrs)] = i
-    next
-  }
-  corrs = acf(HR,plot=F,lag.max=3,type="correlation")$acf
-  autocorrs = rbind(autocorrs,as.numeric(corrs)[-1])
-  rownames(autocorrs)[nrow(autocorrs)] = i
-  if(as.numeric(i)%%1000==0){print(i)}
-}
-
-# Plot the correlation vs the autocorrelation, useful for the supplementary
-try({
-  r2 = r2_values[,1]; autoc = autocorrs[,1]
-  library(hexbin)
-  # pariwise plots
-  plot(pairwise_plot(r2,autoc,hexbin,xbins=100),ylab="Autocorrelation",xlab="R^2")
-  #plot(pairwise_plot(r2,wd_tp_cor,hexbin,fully_comps,xbins=100),ylab="Dev",xlab="R^2")
-  # boxplots
-  par(mfrow=c(1,2),mar=c(5,4,4,4))
-  boxplot(get_list_by_values(r2,subject_technical_class[names(r2)]),ylim=c(0.6,1),ylab="R^2",las=2)
-  boxplot(get_list_by_values(autocorrs[,1],subject_technical_class[rownames(autocorrs)]),las=2,ylab="Autocorrelation")
-  plot(pairwise_plot(r2,autoc,hexbin,fully_comps,xbins=100),ylab="Autocorrelation",xlab="R^2")
-  plot(pairwise_plot(r2,sd_HRs,hexbin,fully_comps,xbins=100),ylab="HR sd",xlab="R^2")
-})
-
-# Save the additional computed scores
-save(rho_exercise,rho_rest,r2_values,autocorrs,file=paste("Regression_correlation_time_series_qc_scores.RData",sep=''))
+# # Compare the R-sq scores of different regression analyses
+# r2_values = c()
+# for(i in names(lm_inputs)){
+#   if(is.null(lm_inputs[[i]])){next}
+#   WD = lm_inputs[[i]]$WD; HR = lm_inputs[[i]]$HR
+#   TP = lm_inputs[[i]]$TP
+#   if(length(WD)<3){
+#     r2_values = rbind(r2_values,c(NA,NA,NA))
+#     rownames(r2_values)[nrow(r2_values)] = i
+#     next
+#   }
+#   obj1 = lm(HR~WD); obj2 = lm(HR~TP); obj3 = lm(HR~TP+WD)
+#   r2_values = rbind(r2_values,c(get_lm_r2(obj1),get_lm_r2(obj2),get_lm_r2(obj2)))
+#   rownames(r2_values)[nrow(r2_values)] = i
+#   if(as.numeric(i)%%1000==0){print(i)}
+# }
+# 
+# # Compute  the autocorrelations of the heart rates
+# autocorrs = c()
+# for(i in names(lm_inputs)){
+#   if(is.null(lm_inputs[[i]])){next}
+#   WD = lm_inputs[[i]]$WD; HR = lm_inputs[[i]]$HR
+#   TP = lm_inputs[[i]]$TP
+#   if(length(WD) < 5){
+#     autocorrs = rbind(autocorrs,c(NA,NA,NA))
+#     rownames(autocorrs)[nrow(autocorrs)] = i
+#     next
+#   }
+#   corrs = acf(HR,plot=F,lag.max=3,type="correlation")$acf
+#   autocorrs = rbind(autocorrs,as.numeric(corrs)[-1])
+#   rownames(autocorrs)[nrow(autocorrs)] = i
+#   if(as.numeric(i)%%1000==0){print(i)}
+# }
+# 
+# # Plot the correlation vs the autocorrelation, useful for the supplementary
+# try({
+#   r2 = r2_values[,1]; autoc = autocorrs[,1]
+#   library(hexbin)
+#   # pariwise plots
+#   plot(pairwise_plot(r2,autoc,hexbin,xbins=100),ylab="Autocorrelation",xlab="R^2")
+#   #plot(pairwise_plot(r2,wd_tp_cor,hexbin,fully_comps,xbins=100),ylab="Dev",xlab="R^2")
+#   # boxplots
+#   par(mfrow=c(1,2),mar=c(5,4,4,4))
+#   boxplot(get_list_by_values(r2,subject_technical_class[names(r2)]),ylim=c(0.6,1),ylab="R^2",las=2)
+#   boxplot(get_list_by_values(autocorrs[,1],subject_technical_class[rownames(autocorrs)]),las=2,ylab="Autocorrelation")
+#   plot(pairwise_plot(r2,autoc,hexbin,fully_comps,xbins=100),ylab="Autocorrelation",xlab="R^2")
+#   plot(pairwise_plot(r2,sd_HRs,hexbin,fully_comps,xbins=100),ylab="HR sd",xlab="R^2")
+# })
+# # Save the additional computed scores
+# save(rho_exercise,rho_rest,r2_values,autocorrs,file=paste("Regression_correlation_time_series_qc_scores.RData",sep=''))
 
 ###############################################
 ###############################################
@@ -581,52 +525,6 @@ all(is.na(x1)==is.na(x2))
 ###############################################
 ###############################################
 
-
-# Start with generating a comparison of the scores
-# Use category 1 to compare the repeats; HR preds
-x1 = data_slice2fitness_score_objects[["0;Category 1"]]$HR_pred_WD[,2]
-x2 = data_slice2fitness_score_objects[["1;Category 1"]]$HR_pred_WD[,2]
-subjects_in_both = intersect(names(x1),names(x2))
-hist(log(x2));hist(log(x1))
-qqplot(log(x1),log(x2));abline(0,1)
-x1_i = x1[subjects_in_both];x2_i = x2[subjects_in_both]
-plot(x1_i,x2_i);abline(0,1)
-wilcox.test(x1_i,x2_i,paired = T)$p.value
-get_pairwise_corrs(cbind(x1_i,x2_i),method='spearman')
-
-# Use category 1 to compare the repeats; HR preds
-x1 = data_slice2fitness_score_objects[["1;Category 1"]]$HR_pred_WD[,2]
-x2 = data_slice2fitness_score_objects[["0;Category 2"]]$HR_pred_WD[,2]
-subjects_in_both = intersect(names(x1),names(x2))
-hist(log(x2));hist(log(x1))
-qqplot(log(x1),log(x2));abline(0,1)
-x1_i = x1[subjects_in_both];x2_i = x2[subjects_in_both]
-plot(x1_i,x2_i);abline(0,1)
-wilcox.test(x1_i,x2_i,paired = T)$p.value
-get_pairwise_corrs(cbind(x1_i,x2_i),method='spearman')
-
-# Compare the categories within the same repeat
-x1 = data_slice2fitness_score_objects[["0;Category 1"]]$HR_pred_WD[,2]
-x2 = data_slice2fitness_score_objects[["0;Category 2"]]$HR_pred_WD[,2]
-qqplot(log(x1),log(x2));abline(0,1)
-ks.test(x1,x2)
-# Use category 1 to compare the repeats; HR preds
-x1 = data_slice2fitness_score_objects[["1;Category 1"]]$HR_pred_WD[,2]
-x2 = data_slice2fitness_score_objects[["1;Category 2"]]$HR_pred_WD[,2]
-qqplot(log(x1),log(x2));abline(0,1)
-ks.test(x1,x2)
-
-# Use category 1 to compare the repeats; Rest scores
-x1 = data_slice2fitness_score_objects[["0;Category 1"]]$HR_ratios[,2]
-x2 = data_slice2fitness_score_objects[["1;Category 1"]]$HR_ratios[,2]
-subjects_in_both = intersect(names(x1),names(x2))
-hist(log(x2));hist(log(x1))
-qqplot(log(x1),log(x2));abline(0,1)
-x1_i = x1[subjects_in_both];x2_i = x2[subjects_in_both]
-plot(x1_i,x2_i);abline(0,1)
-wilcox.test(x1_i,x2_i,paired = T)$p.value
-get_pairwise_corrs(cbind(x1_i,x2_i),method='spearman')
-
 par(mfrow=c(2,2))
 HR_ratios = lapply(data_slice2fitness_score_objects,function(x)x$HR_ratios[,2])
 HR_ratios_merged = merge_scores_list(HR_ratios,main = "Rest HR ratios after 60sec")
@@ -657,38 +555,39 @@ save(HR_ratios_merged,HR_pred_WDs_merged,
      HR_WD_slopes_merged,max_WDs_merged,
      fitness_scores_matrix,file="fitness_analysis_final_fitness_scores.RData")
 
-library(corrplot)
-corrplot(get_pairwise_corrs(fitness_scores_matrix))
+# Add binary covariate of completion status
+load("biobank_collated_pheno_data.RData")
+feature_code2name = sapply(colnames(pheno_data),function(x)strsplit(x,split='\\.')[[1]][1])
+status_cols = get_regex_cols(colnames(pheno_data),"status of test")
+exercise_test_status = pheno_data[,status_cols]
+all_nas = apply(is.na(exercise_test_status),1,all)
+exercise_test_status = exercise_test_status[!all_nas,]
+exercise_test_status = merge_columns_by_their_features(exercise_test_status,feature_code2name[colnames(exercise_test_status)])
+v = rep(NA,length(exercise_test_status))
+v[names(exercise_test_status)[exercise_test_status=="Fully completed"]] = "1"
+v[names(exercise_test_status)[exercise_test_status!="Fully completed"]] = "0"
+v = as.numeric(v)
+names(v) = names(exercise_test_status)
+table(v)
+load("fitness_analysis_final_fitness_scores.RData")
+added_subject = setdiff(names(v),rownames(fitness_scores_matrix))
+added_NA_mat = matrix(NA,nrow=length(added_subject),ncol=ncol(fitness_scores_matrix))
+colnames(added_NA_mat) = colnames(fitness_scores_matrix)
+rownames(added_NA_mat) = added_subject
+fitness_scores_matrix = rbind(fitness_scores_matrix,added_NA_mat)
+fitness_scores_matrix = cbind(fitness_scores_matrix,v[rownames(fitness_scores_matrix)])
+colnames(fitness_scores_matrix)[ncol(fitness_scores_matrix)] = "Completed_or_not"
+save(HR_ratios_merged,HR_pred_WDs_merged,
+     HR_WD_slopes_merged,max_WDs_merged,
+     fitness_scores_matrix,file="fitness_analysis_final_fitness_scores.RData")
 
-# Merge the results
-merge_scores_list<-function(l,plot_class_averages = T,...){
-  all_subjects = c()
-  for(x in l){
-    all_subjects = union(all_subjects,names(x))
-  }
-  l = lapply(l,function(x)x[!is.na(x)])
-  scores = rep(0,length(all_subjects));classes = rep(NA,length(all_subjects));counts = rep(0,length(all_subjects))
-  names(scores) = all_subjects;names(classes) = all_subjects;names(counts) = all_subjects
-  for(nn in names(l)){
-    curr_scores = l[[nn]]
-    curr_names = names(curr_scores)
-    scores[curr_names] = scores[curr_names] + curr_scores
-    counts[curr_names] = counts[curr_names] + 1
-    curr_classes = classes[curr_names]
-    curr_na_classes = is.na(curr_classes)
-    curr_classes[curr_na_classes] = nn
-    curr_classes[!curr_na_classes] = "multiple"
-    classes[curr_names] = curr_classes
-  }
-  table(counts)
-  tests = all(is.na(classes[counts==0]))
-  tests = tests & all(names(which(counts=="multiple")) == names(which(counts>1)))
-  scores[counts>1] = scores[counts>1]/counts[counts>1]
-  scores[counts==0] = NA
-  d = data.frame(scores=scores,classes=classes)
-  if(plot_class_averages){plot.design(d,...)}
-  return(d)
-}
+# Sanity check 1: compare the scores to the previous version 
+load('UKBB_phenotypic_data_for_GWAS.RData')
+x1 = fitness_scores_matrix[,"Predicted HR at WD=100"]
+x2 = fitness_scores[,"HR_pred_100"]
+inter = intersect(names(x1),names(x2))
+plot(x1[inter],x2[inter]);abline(0,1)
+get_pairwise_corrs(cbind(x1[inter],x2[inter]))
 
 ###############################################
 ###############################################
@@ -701,9 +600,14 @@ merge_scores_list<-function(l,plot_class_averages = T,...){
 ##### Supplementary Figures and stats #########
 ###############################################
 ###############################################
+
+load("fitness_analysis_data_slice2fitness_score_objects.RData")
+load("fitness_analysis_data_slice2_quality_scores.RData")
+
 # By sections in the Supplementary test file:
 # 1.1 The data
 # Subjects with a category - look at category_matrix
+load("fitness_analysis_preprocessed_data_slices.RData")
 dim(category_matrix)
 subjects_concatenated_category = apply(category_matrix,1,paste,collapse=';')
 subject_categories_repeat1 = table(category_matrix[,1])
@@ -712,9 +616,178 @@ subject_categories_repeat1 = paste(paste(names(subject_categories_repeat1),subje
 repeat2na_table = apply(category_matrix,2,function(x)table(is.na(x)))
 
 # 1.2 Analysis of the workloads
+# Check the number of times the extracted window of the exercise phase was indeed monotone
+monotone_stats = sapply(preprocessed_data_slices,function(x)sapply(x$tps_vs_wkls,function(x)x$is_mono))
+percent_monotone_in_slice = sapply(monotone_stats,function(x)table(x)/length(x))
+overall_percent_monotone = table(unlist(monotone_stats))/length(unlist(monotone_stats))
+sapply(monotone_stats,length)
+regression_window_sizes_in_exercise_phase = sapply(preprocessed_data_slices,function(x)sapply(x$tps_vs_wkls,function(x)length(x$values)))
+no_time_windows = lapply(regression_window_sizes_in_exercise_phase,function(x)x[x==0])
+sapply(no_time_windows,length)
+length(unique(unlist(sapply(no_time_windows,names))))
+small_windows  = lapply(regression_window_sizes_in_exercise_phase,function(x)x[x>0 & x<MIN_REGR_SIZE])
+sapply(small_windows,length)
+length(unique(unlist(sapply(small_windows,names))))
+gc()
+# Figure S1.1
+curr_slice_name = "0;Category 1"
+pheno_data = preprocessed_data_slices[[curr_slice_name]][["pheno_data"]]
+regex_matrices = preprocessed_data_slices[[curr_slice_name]][["regex_matrices"]]
+tps_vs_wkls = preprocessed_data_slices[[curr_slice_name]][["tps_vs_wkls"]]
+regr_inputs = preprocessed_data_slices[[curr_slice_name]][["regr_inputs"]]
+subject2test_status = preprocessed_data_slices[[curr_slice_name]][["subject2test_status"]]
+subject2sex = preprocessed_data_slices[[curr_slice_name]][["subject2sex"]]
+numeric_phase_mat = regex_matrices[["phase"]]
+numeric_phase_mat[numeric_phase_mat == "Pretest"] = "0"
+numeric_phase_mat[numeric_phase_mat == "Exercise"] = "1"
+numeric_phase_mat[numeric_phase_mat=="Rest"] = "2"
+numeric_phase_mat[numeric_phase_mat == "MANUAL"] = "1"
+mode(numeric_phase_mat) = "numeric"
+# Visualize the experiment of a random subject
+rand_ind = sample(1:nrow(regex_matrices[["time"]]))[1]
+numeric_timepoints = regex_matrices[["time"]]
+mode(numeric_timepoints) = "numeric"
+new_time_order = as.numeric(numeric_phase_mat[rand_ind,])*1000 + numeric_timepoints[rand_ind,]
+plot(new_time_order,regex_matrices[["workload"]][rand_ind,],
+     xlab = "Time (seconds within phases)", ylab="Workload")
+#plot(regex_matrices[["heartrate"]][rand_ind,],regex_matrices[["workload"]][rand_ind,1:112])
 
+# 1.3 - Separation into subject classes
+load("fitness_analysis_data_slice2_quality_scores.RData")
+technical_class_sizes = sapply(data_slice2_quality_scores,function(x)table(x$subject_technical_class))
+# Figure S1.2 like plots - specify the data slice and run!
+slice_name = "0;Category 1"
+lm_inputs = preprocessed_data_slices[[slice_name]]$regr_inputs
+subject2test_status = preprocessed_data_slices[[slice_name]]$subject2test_status[names(lm_inputs)]
+subject2sex = preprocessed_data_slices[[slice_name]]$subject2sex[names(lm_inputs)]
+pheno_data = preprocessed_data_slices[[slice_name]]$pheno_data
+regex_matrices = preprocessed_data_slices[[slice_name]]$regex_matrices
+rho_exercise = data_slice2_quality_scores[[slice_name]][["rho_exercise"]] 
+wsize_exercise = data_slice2_quality_scores[[slice_name]][["wsize_exercise"]]
+rho_rest = data_slice2_quality_scores[[slice_name]][["rho_rest"]]
+wsize_rest = data_slice2_quality_scores[[slice_name]][["wsize_rest"]]
+subject_technical_class = data_slice2_quality_scores[[slice_name]][["subject_technical_class"]]
+max_WD_pheno_data = data_slice2_quality_scores[[slice_name]][["max_WD_pheno_data"]]
+max_WDs = data_slice2_quality_scores[[slice_name]][["max_WDs"]]
+sizes = sapply(lm_inputs,function(x)length(x$HR))
+# The warnings we get from the commands below are due to subjects with no data
+mean_HRs = sapply(lm_inputs,function(x)mean(x$HR))
+max_HRs = sapply(lm_inputs,function(x)max(x$HR))
+sd_HRs = sapply(lm_inputs,function(x)sd(x$HR))
+mean_WDs = sapply(lm_inputs,function(x)mean(x$WD))
+par(mfrow=c(2,3),mar=c(6,6,1,4))
+# Warning in the commands below are due to subjects with no data, ignore
+boxplot(get_list_by_values(sizes,subject_technical_class,values_to_ignore = c("No data")),las=2,ylab="window size",cex.axis=1.6,cex.lab=1.5)
+boxplot(get_list_by_values(mean_WDs,subject_technical_class,values_to_ignore = c("No data")),las=2,ylab = "mean workload",cex.axis=1.6,cex.lab=1.5)
+boxplot(get_list_by_values(max_WDs,subject_technical_class,values_to_ignore = c("No data")),las=2,ylab="max workload",cex.axis=1.6,cex.lab=1.5)
+boxplot(get_list_by_values(mean_HRs,subject_technical_class,values_to_ignore = c("No data")),las=2,ylab="mean heart rate",cex.axis=1.6,cex.lab=1.5)
+boxplot(get_list_by_values(max_HRs,subject_technical_class,values_to_ignore = c("No data")),las=2,ylab="max heart rate",cex.axis=1.6,cex.lab=1.5)
+boxplot(get_list_by_values(sd_HRs,subject_technical_class,values_to_ignore = c("No data")),las=2,ylab="heart rate sd",cex.axis=1.6,cex.lab=1.5)
+# Comments:
+# Subjects that did not complete the tests (most likely have) low fitness.
+# Subject that completed the test and had very few WDs are more similar to the 
+# uncompleted cases than to the other completed cases.
+# Changing the window size threshold to 15 eliminates the separation between the completed
+# cases in terms of hear rates (mean, max).
+
+# 1.4 Quality tests: heart rate vs. time at different phases
+# Rho statistics on all slices
+rho_exercise_l = lapply(data_slice2_quality_scores,function(x)x$rho_exercise)
+rho_exercise_all = unlist(rho_exercise_l)
+rho_exercise_all = rho_exercise_all[!is.na(rho_exercise_all)]
+table(rho_exercise_all>0.5)/length(rho_exercise_all)
+rho_rest_l = lapply(data_slice2_quality_scores,function(x)x$rho_rest)
+rho_rest_all = unlist(rho_rest_l)
+rho_rest_all = rho_rest_all[!is.na(rho_rest_all)]
+table(rho_rest_all < (-0.5))/length(rho_rest_all)
+
+load("Regression_correlation_time_series_qc_scores.RData")
+
+# Plot the correlation vs the autocorrelation, useful for the supplementary
+try({
+  r2 = r2_values[,1]; autoc = autocorrs[,1]
+  library(hexbin)
+  # Figure S1.3
+  par(mfrow=c(2,2))
+  l = get_list_by_values(rho_exercise,subject_technical_class,values_to_ignore = "No data")
+  boxplot(l,ylab="Rho",main="Exercise",las=2)
+  qqplot(l[[1]],l[[3]],xlab=names(l)[1],ylab=names(l)[3],cex=1.3,col="grey",pch=20,main="Exercise rho");abline(0,1,lty=2,lwd=2)
+  l = get_list_by_values(rho_rest,subject_technical_class,values_to_ignore = "No data")
+  boxplot(l,ylab="Rho",main="Rest",las=2)
+  qqplot(l[[1]],l[[3]],xlab=names(l)[1],ylab=names(l)[3],cex=1.3,col="grey",pch=20,main="Rest rho");abline(0,1,lty=2,lwd=2)
+  # Figure S1.4A,B
+  boxplot(get_list_by_values(r2,subject_technical_class[names(r2)],values_to_ignore = "No data"),ylim=c(0.6,1),ylab="R^2",las=2)
+  boxplot(get_list_by_values(autocorrs[,1],subject_technical_class[rownames(autocorrs)],values_to_ignore = "No data"),las=2,ylab="Autocorrelation")
+  # Figure S1.4C
+  plot(pairwise_plot(r2,autoc,hexbin,xbins=100),ylab="Autocorrelation",xlab="R^2")
+})
+# Examples for plots Figure S1.4A and Figure S1.5
+# TODO: implement and add this part
+
+# 1.6 Estimation of physical fitness scores
+load("fitness_analysis_final_fitness_scores.RData")
+library(corrplot)
+# Figure S1.6A
+corrplot(get_pairwise_corrs(fitness_scores_matrix))
+# Figure S1.6B
+fully_comps = names(which(subject_technical_class=="C:Large"))
+corrplot(get_pairwise_corrs(fitness_scores_matrix[fully_comps,]))
+others = setdiff(rownames(fitness_scores_matrix),fully_comps)
+corrplot(get_pairwise_corrs(fitness_scores_matrix[others,]))
 # Summary: subjects with fitness scores
 apply(fitness_scores_matrix,2,function(x)table(is.na(x)))
+
+# Figure S1.7
+par(mfrow=c(2,2))
+plot.design(HR_ratios_merged,main = colnames(fitness_scores_matrix)[1])
+plot.design(HR_pred_WDs_merged,main = colnames(fitness_scores_matrix)[2])
+plot.design(HR_WD_slopes_merged,main = colnames(fitness_scores_matrix)[3])
+plot.design(max_WDs_merged,main = colnames(fitness_scores_matrix)[4])
+
+
+# Figure S1.8 - compare shared subjects across the slices
+slice_pair2somparison = list()
+for (nn1 in names(data_slice2fitness_score_objects)){
+  for(nn2 in names(data_slice2fitness_score_objects)){
+    if(nn1 == nn2){next}
+    curr_name = paste(sort(c(nn1,nn2)),collapse = ",")
+    if(curr_name %in% names(slice_pair2somparison)){next}
+    slice_pair2somparison[[curr_name]] = list()
+    x1 = data_slice2fitness_score_objects[[nn1]]$HR_pred_WD[,2]
+    x2 = data_slice2fitness_score_objects[[nn2]]$HR_pred_WD[,2]
+    subjects_in_both = intersect(names(x1),names(x2))
+    x1_i = x1[subjects_in_both];x2_i = x2[subjects_in_both]
+    slice_pair2somparison[[curr_name]][["HR_pred_100"]] = cbind(x1_i,x2_i)
+    colnames(slice_pair2somparison[[curr_name]][["HR_pred_100"]]) = c(nn1,nn2)
+  }
+}
+get_slices_corrs<-function(x){
+  if(is.null(dim(x$HR_pred_100))){return (NA)}
+  else{return(get_pairwise_corrs(x$HR_pred_100))}
+}
+get_slices_inter_size<-function(x){
+  if(is.null(dim(x$HR_pred_100))){return (NA)}
+  else{
+    m = x$HR_pred_100
+    has_na = apply(is.na(m),1,any)
+    return(sum(!has_na))
+  }
+}
+get_slices_inter_wilcox<-function(x){
+  if(is.null(dim(x$HR_pred_100))){return (NA)}
+  else{
+    m = x$HR_pred_100
+    has_na = apply(is.na(m),1,any)
+    if(sum(!has_na)<5){return(NA)}
+    x1 = m[!has_na,1];x2=m[!has_na,2]
+    return(wilcox.test(x1,x2,paired=T)$p.value)
+  }
+}
+correls = sapply(slice_pair2somparison,function(x)get_slices_corrs(x)[1,2])
+sizes = sapply(slice_pair2somparison,get_slices_inter_size)
+pvals = sapply(slice_pair2somparison,get_slices_inter_wilcox)
+tmp_obj = slice_pair2somparison[["0;Category 1,1;Category 1"]]$HR_pred_100
+plot(x=tmp_obj[,1],y=tmp_obj[,2],xlab=colnames(tmp_obj)[1],ylab=colnames(tmp_obj)[2]);abline(0,1)
 
 ###############################################
 ###############################################

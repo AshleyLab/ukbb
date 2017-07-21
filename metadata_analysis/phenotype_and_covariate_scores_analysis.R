@@ -11,6 +11,10 @@ library(xlsx)
 ###############################################
 ###############################################
 
+# define constants
+MAX_NUM_CATEGORIES_IN_DISCRETE_COVARIATE = 100
+MIN_CLASS_SIZE_IN_DISCRETE_COVARIATE = 500
+
 # Load the preprocessed data and the pheno data
 load("biobank_collated_pheno_data.RData")
 
@@ -55,20 +59,7 @@ accelerometry_scores = accelerometry_scores[,-c(1:2)]
 accelerometry_scores_all_nas = apply(is.na(accelerometry_scores),1,all)
 table(accelerometry_scores_all_nas)
 accelerometry_scores = accelerometry_scores[!accelerometry_scores_all_nas,]
-# b. IDC-9 (???)
-# c. PA related columns
-extract_feature_cols_by_category<-function(cols,cols2names,names2cats,category){
-  curr_features = c()
-  for(nn in cols){
-    curr_name = cols2names[nn]
-    curr_cat = names2cats[curr_name]
-    if(is.na(curr_cat)){next}
-    if(curr_cat==category){
-      curr_features = c(curr_features,nn)
-    }
-  }
-  return(curr_features)
-}
+
 additional_scores = list()
 spiro_cols = extract_feature_cols_by_category(colnames(pheno_data),feature_code2name,feature_subcategory_data,"Spirometry")
 additional_scores[['Spirometry']] = pheno_data[,spiro_cols]
@@ -81,7 +72,6 @@ pulse_rate_cols = get_regex_cols(colnames(pheno_data),"pulse rate\\.",ignore.cas
 additional_scores[['Pulse rate']] = pheno_data[,pulse_rate_cols]
 hand_grip_cols = get_regex_cols(colnames(pheno_data),"Hand grip",ignore.case=T)
 additional_scores[['hand grip']] = pheno_data[,hand_grip_cols]
-gc()
 
 ###############################################
 #################### End ######################
@@ -95,10 +85,9 @@ gc()
 ###############################################
 
 # Define the sample set to work with: union of the above
-intersect(rownames(accelerometry_scores),rownames(fitness_scores_matrix))
 subject_set = union(rownames(accelerometry_scores),rownames(fitness_scores_matrix))
 
-# Define data column types to be excluded automatically
+# Filter 1: Define data column types to be excluded automatically
 categories_to_exclude = c("Cognitive function")
 potential_subcategories_to_exclude = c()
 subcategories_to_exclude = c(
@@ -106,8 +95,9 @@ subcategories_to_exclude = c(
   "Brain MRI","Acceleration averages"
 )
 # Add the columns of the additional PA scores above
+# Filter 1
 features_to_exclude = unique(unlist(sapply(additional_scores,colnames)))
-
+# Filter 2
 # Remove columns using the above recommentations and the defined categories to remove
 for(j in 1:ncol(pheno_data)){
   currf = colnames(pheno_data)[j]
@@ -133,92 +123,132 @@ length(features_to_exclude)
 # Filter 1: Trim the data matrix by columns and rows above
 pheno_data = pheno_data[,-which(is.element(colnames(pheno_data),set=features_to_exclude))]
 pheno_data = pheno_data[subject_set,]
+print(dim(pheno_data))
 gc()
-# Filter 2: Features with >99% NAs in the resulting matrix
+
+# Filter 1.1: Features with 100% NAs in the resulting matrix (save some running time)
 percent_nas_col = colSums(is.na(pheno_data))/nrow(pheno_data)
-pheno_data = pheno_data[,percent_nas_col < 0.99]
+pheno_data = pheno_data[,percent_nas_col < 1]
+print(dim(pheno_data))
+gc()
+
 pheno_data_feature2name = feature_code2name[colnames(pheno_data)]
+colnames(pheno_data)[is.na(pheno_data_feature2name)]
 # Corrections for the NAs in the names
 names(pheno_data_feature2name) = colnames(pheno_data)
 pheno_data_feature2name["Weight.0.0.1"] = "Weight"
 pheno_data_feature2name["Weight.1.0.1"] = "Weight"
-pheno_data_feature2name["Body mass index (BMI).0.0.1"] = "BMI"
-pheno_data_feature2name["Body mass index (BMI).1.0.1"] = "BMI"
-gc()
+pheno_data_feature2name["Body mass index (BMI).0.0.1"] = "Body mass index (BMI)"
+pheno_data_feature2name["Body mass index (BMI).1.0.1"] = "Body mass index (BMI)"
 
-# Filter 3: exclude categorical features with too many classes (>100) 
+# Filter 6: exclude categorical features with too many classes (>100) 
 # or that all classes are too small (<500)
 feature_is_numeric = c()
 for(j in 1:ncol(pheno_data)){
   feature_is_numeric[j] = !all(is.na(as.numeric(as.character(pheno_data[,j]))))
 }
-table(feature_is_numeric)
+print(table(feature_is_numeric))
 names(feature_is_numeric) = colnames(pheno_data)
 features_to_exclude = c()
 for(j in 1:ncol(pheno_data)){
   if(feature_is_numeric[j]){next}
-  if(length(unique(pheno_data[,j]))>100){
+  if(length(unique(pheno_data[,j]))>MAX_NUM_CATEGORIES_IN_DISCRETE_COVARIATE){
     features_to_exclude = c(features_to_exclude,j)
     next
   }
-  v = pheno_data[,j]
-  v = v[!is.na(v)]
-  if(max(table(v))<500){
+  v = pheno_data[,j];v = v[!is.na(v)]
+  if(max(table(v))<MIN_CLASS_SIZE_IN_DISCRETE_COVARIATE){
     features_to_exclude = c(features_to_exclude,j)
   }
 }
 length(features_to_exclude)
+colnames(pheno_data)[features_to_exclude]
 pheno_data = pheno_data[,-features_to_exclude]
 pheno_data_feature2name = pheno_data_feature2name[colnames(pheno_data)]
+print(dim(pheno_data))
+gc()
 
-# Filter 4: Merge by feature name, exclude certain regular expressions
+# Filter 3+4: Merge by feature name, exclude certain regular expressions
 # The merge is done by taking the first column and using the others to fill NAs
 regex_to_exclude = c("device","last hour","interpolated","operation code",
                      "method of recording","genetic principal","quality control","date of")
-new_pheno_dat = c()
+new_pheno_dat = data.frame(subjnames = rownames(pheno_data))
 for(nn in unique(pheno_data_feature2name)){
   if(any(sapply(regex_to_exclude,grepl,x=nn,ignore.case=T))){next}
   curr_cols = pheno_data[,pheno_data_feature2name == nn]
   if(sum(pheno_data_feature2name == nn)==1){
-    new_pheno_dat = cbind(new_pheno_dat,curr_cols)
+    v = data.frame(nn = curr_cols)
   }
   else{
-    v = curr_cols[,1]
-    for(j in 2:ncol(curr_cols)){
-      curr_NAs = is.na(v)
-      v[curr_NAs] = curr_cols[curr_NAs,j]
-    }
-    new_pheno_dat = cbind(new_pheno_dat,v)
+    v = data.frame(nn = merge_feature_columns(curr_cols))
   }
+  new_pheno_dat = cbind(new_pheno_dat,v)
   colnames(new_pheno_dat)[ncol(new_pheno_dat)] = nn
+  #print(ncol(new_pheno_dat))
 }
-dim(new_pheno_dat)
 rownames(new_pheno_dat) = rownames(pheno_data)
+new_pheno_dat = new_pheno_dat[,-1]
+print(dim(new_pheno_dat))
+gc()
 
-# Filter 5: For covariate analysis, exclude features that are 40%
+# Filter 5: For covariate analysis, exclude features that are 20% NAs or higher
 features_to_exclude = apply(is.na(new_pheno_dat),2,sum)/nrow(new_pheno_dat) >= 0.2
 new_pheno_dat = new_pheno_dat[,!features_to_exclude]
 dim(new_pheno_dat)
-# Check that sex, age, height, weight are there
-get_regex_cols(colnames(new_pheno_dat),"age",ignore.case=T)
-get_regex_cols(colnames(new_pheno_dat),"sex",ignore.case=T)
-get_regex_cols(colnames(new_pheno_dat),"height",ignore.case=T)
-get_regex_cols(colnames(new_pheno_dat),"weight",ignore.case=T)
-get_regex_cols(colnames(new_pheno_dat),"bmi",ignore.case=T)
-get_regex_cols(colnames(new_pheno_dat),"smok",ignore.case=T)
+gc()
 
 covariate_matrix = new_pheno_dat
-feature_is_numeric = c()
+feature_is_numeric = c(); num_categories = c()
 for(j in 1:ncol(covariate_matrix)){
   feature_is_numeric[j] = !all(is.na(as.numeric(as.character(covariate_matrix[,j]))))
+  if(feature_is_numeric[j]){num_categories[j] = NA}
+  else{num_categories[j] = length(unique(covariate_matrix[,j]))}
 }
 table(feature_is_numeric)
+table(num_categories)
 names(feature_is_numeric) = colnames(covariate_matrix)
-
 save(covariate_matrix,feature_is_numeric,file="covariate_matrix.RData")
-
 rm(pheno_data,new_pheno_dat)
 gc()
+
+# Check that sex, age, height, weight are there
+get_regex_cols(colnames(covariate_matrix),"age",ignore.case=T)
+get_regex_cols(colnames(covariate_matrix),"sex",ignore.case=T)
+get_regex_cols(colnames(covariate_matrix),"height",ignore.case=T)
+get_regex_cols(colnames(covariate_matrix),"weight",ignore.case=T)
+get_regex_cols(colnames(covariate_matrix),"bmi",ignore.case=T)
+tmp_feature = get_regex_cols(colnames(covariate_matrix),"smok",ignore.case=T)[2]
+
+# # 1.1 SText 2 (The data)
+# # map to pheno_data and look at the raw features vs the computed ones
+# tmp_feature = get_regex_cols(colnames(covariate_matrix),"smok",ignore.case=T)[2]
+# tmp_raw_features = names(which(feature_code2name == tmp_feature))
+# feature_subcategory_data[tmp_feature]
+# tmp_raw_is_num = !all(is.na(pheno_data[,tmp_raw_features[1]]))
+# tmp_raw_non_na_sets = apply(!is.na(pheno_data[,tmp_raw_features]),2,which)
+# sapply(tmp_raw_non_na_sets,length)
+# covered_samples = unique(unlist(tmp_raw_non_na_sets))
+# length(covered_samples)
+# raw_feature_tables = apply(pheno_data[,tmp_raw_features],2,table)
+# rowSums(raw_feature_tables)
+# # Look at different merging options
+# merged_col1 = merge_feature_columns(pheno_data[,tmp_raw_features])
+# table(merged_col1)
+# merged_col2 = merge_feature_columns(pheno_data[,tmp_raw_features],take_first=F)
+# table(merged_col2)
+# merged_col3 = apply(pheno_data[,tmp_raw_features],1,max,na.rm=T)
+# table(merged_col3)
+# merged_col4 = apply(pheno_data[,tmp_raw_features],1,min,na.rm=T)
+# table(merged_col4)
+# merged_col5 = apply(pheno_data[,tmp_raw_features],1,mean,na.rm=T)
+# table(merged_col5)
+# ###
+# # check consistency:
+# inter1 = intersect(tmp_raw_na_sets[[1]],tmp_raw_na_sets[[2]])
+# inter1_matrix = pheno_data[inter1,tmp_raw_features[1:2]]
+# table(apply(inter1_matrix,1,function(x)(all(x==x[1]))))
+# length(intersect(tmp_raw_na_sets[[1]],tmp_raw_na_sets[[3]]))
+# computed_tmp_feature = covariate_matrix[,tmp_feature[5]]
 
 ###############################################
 ###############################################
@@ -232,48 +262,74 @@ gc()
 ###############################################
 ###############################################
 
+# Simple analysis
+simple_covs = covariate_matrix[,c("Sex","Age when attended assessment centre","Body mass index (BMI)","BMI","Standing height")]
 fitness_vs_covs_lm_objects = list()
 for (fitness_score_ind in 1:ncol(fitness_scores_matrix)){
   y = fitness_scores_matrix[,fitness_score_ind]
   currname = colnames(fitness_scores_matrix)[fitness_score_ind]
-  if(is.element(currname,set=names(fitness_vs_covs_lm_objects))){next}
-  # All covariates, without the additionally excluded
+  lm1 = get_lm_residuals(y,simple_covs,use_categorical=T,max_num_classes=20,feature_is_numeric=feature_is_numeric)
+  plot(y[names(lm1[[1]]$residuals)],lm1[[1]]$residuals,ylab="Residual",xlab="Fitness score")
+  fitness_vs_covs_lm_objects[[currname]] = lm1
+  save(fitness_vs_covs_lm_objects,file="fitness_analysis_fitness_vs_covs_lm_objects_simple.RData")
+}
+# Plot for the report: Figure S2.2 
+#load("fitness_analysis_fitness_vs_covs_lm_objects_simple.RData")
+par(mfrow=c(2,2))
+r2_scores = sapply(fitness_vs_covs_lm_objects,function(x)summary(x$lm)[["r.squared"]])
+r2_scores = format(r2_scores,digits=2)
+for (fitness_score_ind in 1:ncol(fitness_scores_matrix)){
+  y = fitness_scores_matrix[,fitness_score_ind]
+  currname = colnames(fitness_scores_matrix)[fitness_score_ind]
+  lm1 = fitness_vs_covs_lm_objects[[currname]]
+  plot(y[names(lm1[[1]]$residuals)],lm1[[1]]$residuals,ylab="Residual",xlab="Fitness score",
+       main=paste(currname,", R^2=",r2_scores[fitness_score_ind],sep=""))
+}
+accelerometry_scores_to_residuals = list()
+for (j in 1:ncol(accelerometry_scores)){
+  y = accelerometry_scores[,j]
+  names(y) = rownames(accelerometry_scores)
+  currname = colnames(accelerometry_scores)[j]
+  lm1 = get_lm_residuals(y,simple_covs,use_categorical=T,max_num_classes=20,feature_is_numeric=feature_is_numeric)
+  plot(y[names(lm1[[1]]$residuals)],lm1[[1]]$residuals,ylab="Residual",xlab="Fitness score")
+  accelerometry_scores_to_residuals[[currname]] = lm1[[1]]$residuals
+  save(accelerometry_scores_to_residuals,file="accelereometry_analysis_score_vs_covs_residuals_simple.RData")
+}
+
+# Conservative analysis
+# fitness_vs_covs_lm_objects = list()
+for (fitness_score_ind in 1:ncol(fitness_scores_matrix)){
+  y = fitness_scores_matrix[,fitness_score_ind]
+  currname = colnames(fitness_scores_matrix)[fitness_score_ind]
   lm1 = get_lm_residuals(y,covariate_matrix,use_categorical=T,max_num_classes=20,feature_is_numeric=feature_is_numeric)
   plot(y[names(lm1[[1]]$residuals)],lm1[[1]]$residuals,ylab="Residual",xlab="Fitness score")
-  lm1_summ = summary(lm1[[1]])
-  sigs = lm1_summ$coefficients[,4]
-  sort(sigs)[1:5]
   fitness_vs_covs_lm_objects[[currname]] = lm1
   save(fitness_vs_covs_lm_objects,file="fitness_analysis_fitness_vs_covs_lm_objects.RData")
 }
+r2_scores = sapply(fitness_vs_covs_lm_objects,function(x)summary(x$lm)[["r.squared"]])
 
-# Load the genetic PCA data and print the tables for the GWAS
-# TODO:
-# 1. Discretize?
-# 2. What to do with NAs?
-genetic_pca_data_path = "plink/may16.eigenvec"
-genetic_pca_data = read.delim(genetic_pca_data_path,sep=" ",header = F)
-dim(genetic_pca_data)
-gwas_data_samples = as.character(genetic_pca_data[,2])
-gwas_data_pcs = genetic_pca_data[,3:4]
-colnames(gwas_data_pcs) = paste("PC",1:ncol(gwas_data_pcs),sep="")
-gwas_data_residuals = c()
-# this vector specifies the direction of the scores - whether higher is 
-# better fitness or not
-for(nn in names(fitness_vs_covs_lm_objects)){
-  lm_obj = fitness_vs_covs_lm_objects[[nn]][[1]]
-  curr_res = lm_obj$residuals
-  curr_res = curr_res[gwas_data_samples]
-  names(curr_res) = gwas_data_samples
-  NA_samples = gwas_data_samples[is.na(curr_res)]
-  gwas_data_residuals = cbind(gwas_data_residuals,curr_res)
+# Plot for the report: Figure S2.2 
+par(mfrow=c(2,2))
+r2_scores = sapply(fitness_vs_covs_lm_objects,function(x)summary(x$lm)[["r.squared"]])
+r2_scores = format(r2_scores,digits=2)
+for (fitness_score_ind in 1:ncol(fitness_scores_matrix)){
+  y = fitness_scores_matrix[,fitness_score_ind]
+  currname = colnames(fitness_scores_matrix)[fitness_score_ind]
+  lm1 = fitness_vs_covs_lm_objects[[currname]]
+  plot(y[names(lm1[[1]]$residuals)],lm1[[1]]$residuals,ylab="Residual",xlab="Fitness score",
+       main=paste(currname,", R^2=",r2_scores[fitness_score_ind],sep=""))
 }
-colnames(gwas_data_residuals) = paste("Residuals_",names(fitness_vs_covs_lm_objects),sep="")
-colnames(gwas_data_residuals) = gsub(colnames(gwas_data_residuals),pattern=" ",replace="_")
-gwas_data = cbind(gwas_data_residuals,as.matrix(gwas_data_pcs))
-get_pairwise_corrs(gwas_data)
-save(gwas_data,file="June14_2017_gwas_data_table.RData")
-write.table(gwas_data,file = "June14_2017_fitness_scores_gwas_data_table.txt",sep="\t",quote=F)
+
+accelerometry_scores_to_residuals = list()
+for (j in 1:ncol(accelerometry_scores)){
+  y = accelerometry_scores[,j]
+  names(y) = rownames(accelerometry_scores)
+  currname = colnames(accelerometry_scores)[j]
+  lm1 = get_lm_residuals(y,covariate_matrix,use_categorical=T,max_num_classes=20,feature_is_numeric=feature_is_numeric)
+  plot(y[names(lm1[[1]]$residuals)],lm1[[1]]$residuals,ylab="Residual",xlab="Fitness score")
+  accelerometry_scores_to_residuals[[currname]] = lm1[[1]]$residuals
+  save(accelerometry_scores_to_residuals,file="accelereometry_analysis_score_vs_covs_residuals_conservative.RData")
+}
 
 ###############################################
 ###############################################
@@ -315,19 +371,17 @@ for(j in 1:ncol(Mc)){
 }
 
 library(entropy)
-covariance_correlation_summary_tables = list()
-curr_subject_set = intersect(rownames(covariate_matrix),rownames(fitness_scores_matrix))
-for(fit_ind in 1:ncol(fitness_scores_matrix)){
-  fv = fitness_scores_matrix[curr_subject_set,fit_ind]
+analyze_associations_between_scores_and_covariates<-function(scores,subject_set,cov_mat,disc_cov_mat,cov2category){
+  summary_table = c()
+  fv = scores[subject_set]
   fv_disc = cut_by_quantiles(fv,nbreaks = cut_size)
   fv_is_na = is.na(fv)
-  summary_table = c()
-  for(j in 1:ncol(Mc)){
-    covv = covariate_matrix[curr_subject_set,j]
-    covv_disc = Mc[curr_subject_set,j]
+  for(j in 1:ncol(cov_mat)){
+    covv = cov_mat[subject_set,j]
+    covv_disc = Mc[subject_set,j]
     covv_na = is.na(covv)
-    cov_name = colnames(Mc)[j]
-    cov_category = feature_category_data[cov_name]
+    cov_name = colnames(cov_mat)[j]
+    cov_category = cov2category[cov_name]
     # correlations
     non_na_inds = !fv_is_na & !is.na(covv)
     sp_rho = NA ; sp_rho_p = NA
@@ -359,75 +413,108 @@ for(fit_ind in 1:ncol(fitness_scores_matrix)){
       fv_na_chisq_p = chisq.test(na_tab)$p.value
       fv_na_mi = mi.empirical(na_tab)
     }
-    
-    cov_summary_scores = c(disc_MI,disc_chisq_pvalue,
-                           fv_na_mi,fv_na_chisq_p,
-                           sp_rho,sp_rho_p,
-                           na_vs_na_MI,na_vs_na_chisq_pvalue)
+    cov_summary_scores = c(disc_MI,disc_chisq_pvalue,fv_na_mi,fv_na_chisq_p,
+                           sp_rho,sp_rho_p,na_vs_na_MI,na_vs_na_chisq_pvalue)
     summary_table = rbind(summary_table,c(cov_name,cov_category,cov_summary_scores))
   }
-  covariance_correlation_summary_tables[[colnames(fitness_scores)[fit_ind]]] = summary_table
-  break
+  colnames(summary_table) = c("Feature","Category","MI-discretized","ChisqP-discretized",
+      "MI-NA fitness","ChisqP-NA fitness","Spearman rho","Spearman rho p","MI-NAs", "ChisqP-NAs")
+  return(summary_table)
+}
+# scores = fitness_scores_matrix[,1]
+# names(scores) = rownames(fitness_scores_matrix)
+# tmp = analyze_associations_between_scores_and_covariates(scores,curr_subject_set,covariate_matrix,Mc,feature_category_data)
+# tmp[1:3,] == covariance_correlation_summary_tables[[1]][1:3,]
+
+# Analyze the fitness scores
+covariance_correlation_summary_tables = list()
+curr_subject_set = intersect(rownames(covariate_matrix),rownames(fitness_scores_matrix))
+for(fit_ind in 1:ncol(fitness_scores_matrix)){
+  scores = fitness_scores_matrix[,fit_ind]
+  names(scores) = rownames(fitness_scores_matrix)
+  summary_table = analyze_associations_between_scores_and_covariates(scores,curr_subject_set,covariate_matrix,Mc,feature_category_data)
+  ord = order(as.numeric(summary_table[,3]),decreasing=T)
+  print(summary_table[ord[1:5],1:4])
+  covariance_correlation_summary_tables[[colnames(fitness_scores_matrix)[fit_ind]]] = summary_table
 }
 names(covariance_correlation_summary_tables) = colnames(fitness_scores_matrix)
-for(nn in corrected_names){
-  colnames(covariance_correlation_summary_tables[[nn]]) = c("Feature","Category","MI-discretized","ChisqP-discretized",
-      "MI-NA fitness","ChisqP-NA fitness","Spearman rho","Spearman rho p","MI-NAs", "ChisqP-NAs")
-  write.table(covariance_correlation_summary_tables[[nn]],file=paste(nn,"_cov_analysis.txt",sep=""),sep="\t",quote=F,row.names=F)
-}
 save(covariance_correlation_summary_tables,file="fitness_analysis_covariance_correlation_summary_tables.RData")
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-par(mfrow=c(1,1),mar=c(5,5,5,5))
-plot(x=pmin(500,-log(na_pval_mat[2,])),y=pmin(500,-log(chisq_pval_mat[2,])),
-     xlab="HR_pred_100 - NA (-log 10 p-values)",ylab="HR_pred_100 - scores (-log 10 p-values)",pch=3,lwd=1.5);abline(0,1)
-
-categories = initial_cov_matrix_feature_subcategory
-categories[grepl(names(categories),pattern="device",ignore.case=T)] = "device"
-pval_list = get_list_by_values(chisq_pval_mat[2,],categories)
-pval_list = lapply(pval_list,function(x)x=-log(x,base=10)) 
-pval_list = lapply(pval_list,function(x)x[!is.na(x)&!is.nan(x)])
-treat_zero_pvals<-function(x){
-  x[is.infinite(x)]=300
-  return(x)
+summary_table_for_the_stext2 = c()
+out_file = "SText2_STable2.1.txt"
+table_cols = c(1,2,3,4,7)
+for(j in 1:length(covariance_correlation_summary_tables)){
+  nn = names(covariance_correlation_summary_tables)[j]
+  summary_table = covariance_correlation_summary_tables[[nn]]
+  is_max_in_cat = rep(F,nrow(summary_table))
+  for(i in 1:nrow(summary_table)){
+    curr_cat = summary_table[i,2]
+    curr_max = max(as.numeric(summary_table[summary_table[,2]==curr_cat,3]),na.rm=T)
+    if(as.numeric(summary_table[i,3])==curr_max){
+      is_max_in_cat[i]=T
+    }
+  }
+  summary_table = summary_table[is_max_in_cat,]
+  ord = order(as.numeric(summary_table[,3]),decreasing=T)
+  summary_table = summary_table[ord,table_cols]
+  summary_table = cbind(rep(nn,nrow(summary_table)),summary_table)
+  summary_table_for_the_stext2 = rbind(summary_table_for_the_stext2,summary_table)
+  write.table(summary_table,file=out_file,sep="\t",quote=F,row.names = F,col.names = j==1,append = j>1)
 }
-pval_list = lapply(pval_list,treat_zero_pvals)
-par(mfrow=c(1,2),mar=c(3,12,3,3))
-boxplot(pval_list,horizontal = T,las=2,col="blue",main="HR_pred_100 - scores (-log10 p)")
 
-pval_list = get_list_by_values(na_pval_mat[2,],categories)
-pval_list = lapply(pval_list,function(x)x=-log(x,base=10)) 
-pval_list = lapply(pval_list,function(x)x[!is.na(x)&!is.nan(x)])
-treat_zero_pvals<-function(x){
-  x[is.infinite(x)]=300
-  return(x)
-}
-pval_list = lapply(pval_list,treat_zero_pvals)
-boxplot(pval_list,horizontal = T,las=2,col="red",main="HR_pred_100 - NA (-log10 p)")
+# Analyze the accelerometry
+acc_mat = accelerometry_scores
+rows_with_nas = apply(is.na(acc_mat),1,any)
+total_na_percent_colm = colSums(is.na(acc_mat))/nrow(acc_mat)
+table(total_na_percent_colm)
+acc_mat = acc_mat[,total_na_percent_colm<0.8]
+total_na_percent_row = rowSums(is.na(acc_mat))/ncol(acc_mat)
+acc_mat = as.matrix(acc_mat[total_na_percent_row<0.5,])
+acc_mat = impute.knn(acc_mat,rowmax = 0.8)$data
+acc_pca = prcomp(acc_mat,retx=T)
+plot(acc_pca)
+acc_pc1 = acc_pca$x[,1]
+curr_subject_set = intersect(rownames(covariate_matrix),rownames(acc_mat))
+acc_vs_covariates = analyze_associations_between_scores_and_covariates(acc_pc1,curr_subject_set,covariate_matrix,Mc,feature_category_data)
+ord = order(as.numeric(acc_vs_covariates[,3]),decreasing=T)
+print(acc_vs_covariates[ord[1:10],1:4])
+write.table(acc_vs_covariates,file="Accelerometry_data_PC1_vs_covariates.txt",quote=F,row.names=F,sep="\t")
 
-# Some funny plots
-tmp = fitness_scores[,2]
-ll = get_list_by_values(tmp,drive_faster)
-boxplot(ll[c("Never/rarely","Sometimes","Often","Most of the time")],las=2,ylab="Poor fitness",ylim=c(50,250),col=gray.colors(4),main="Fitness vs. driving fast (p < 1E-300)")
+# Look at NAs vs. non NAs scores
+names(covariance_correlation_summary_tables)
+ind=2
+currname = names(covariance_correlation_summary_tables)[ind]
+summary_table = covariance_correlation_summary_tables[[ind]]
+colnames(summary_table)
 
-sex = as.character(initial_cov_matrix[,"Sex.0.0"])
-sex_and_driving = paste(drive_faster,sex,sep=';')
-ll2 = get_list_by_values(tmp,sex_and_driving)
-strat_classes = c("Never/rarely","Sometimes","Often","Most of the time")
-strat_males = paste(strat_classes,"Male",sep=';')
-strat_females = paste(strat_classes,"Female",sep=';')
-par(mfrow=c(1,2))
-boxplot(ll2[strat_males],las=2,ylab="Poor fitness",ylim=c(60,200),col=gray.colors(4),names = strat_classes,main="Males")
-boxplot(ll2[strat_females],las=2,ylab="Poor fitness",ylim=c(60,200),col=gray.colors(4),names = strat_classes,main="Females")
+###############################################
+###############################################
+#################### End ######################
+###############################################
+###############################################
+
+###############################################
+###############################################
+############# Tests and Figures ###############
+###############################################
+###############################################
+
+# Figure S2.1
+x1 = -log(pmax(1e-200,as.numeric(summary_table[,"ChisqP-discretized"])),10)
+y1 = -log(pmax(1e-200,as.numeric(summary_table[,"ChisqP-NA fitness"])),10)
+par(mfrow=c(1,2),mar=c(5,5,5,5))
+plot(x=x1,y=y1,
+     main="Predicted HR: p-value",xlab="-log p scores",ylab="-log p NAs",pch=4,lwd=1.5);abline(0,1)
+summary_table[which(y1>150 & x1<10),1]
+summary_table[which(y1==200 & x1==200),1]
+plot(x=summary_table[,"MI-discretized"],y=summary_table[,"MI-NA fitness"],
+     main="Predicted HR: mutual information",xlab="MI vs. scores",ylab="MI vs. NAs",pch=4,lwd=1.5,xlim=c(0,0.2),ylim=c(0,0.2));abline(0,1)
+
+# Compare our results to VERSION 1
+load("UKBB_phenotypic_data_for_GWAS.RData")
+x1 = fitness_scores_matrix[,2]
+colnames(fitness_scores)
+x2 = fitness_scores[,2]
+curr_inter = intersect(names(x1),names(x2))
+get_pairwise_corrs(cbind(x1[curr_inter],x2[curr_inter]),method="spearman")
+

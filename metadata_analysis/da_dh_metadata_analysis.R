@@ -16,8 +16,9 @@ source("auxiliary_functions.R")
 # Load the preprocessed pheno data
 load("biobank_collated_filtered_pheno_data.RData")
 
-# Split by the experiment
+# Split by the experiment (time point to repeat number)
 tp_to_repeat = sapply(colnames(subject_cleaned_pheno_data),function(x)strsplit(x,split = "\\.")[[1]][2])
+table(tp_to_repeat)
 
 # Paramaters by which we slice the data
 REPEAT = "0"
