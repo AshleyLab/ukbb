@@ -1,6 +1,6 @@
 try({setwd("/Users/davidhsu/Documents/ukbb")})
 try({setwd("/Users/david/Desktop/ukbb/")})
-try({setwd('/scratch/PI/euan/projects/ukbb/da_dh/')})
+
 # We cannot change the working directory as we work in RStudio, so we comment out this line temporarily.
 source("auxiliary_functions.R")
 library(xlsx)
@@ -217,6 +217,8 @@ get_regex_cols(colnames(covariate_matrix),"sex",ignore.case=T)
 get_regex_cols(colnames(covariate_matrix),"height",ignore.case=T)
 get_regex_cols(colnames(covariate_matrix),"weight",ignore.case=T)
 get_regex_cols(colnames(covariate_matrix),"bmi",ignore.case=T)
+get_regex_cols(colnames(covariate_matrix),"batch",ignore.case=T)
+get_regex_cols(colnames(covariate_matrix),"centr",ignore.case=T)
 tmp_feature = get_regex_cols(colnames(covariate_matrix),"smok",ignore.case=T)[2]
 
 # # 1.1 SText 2 (The data)
@@ -262,8 +264,10 @@ tmp_feature = get_regex_cols(colnames(covariate_matrix),"smok",ignore.case=T)[2]
 ###############################################
 ###############################################
 
+load("covariate_matrix.RData")
+
 # Simple analysis
-simple_covs = covariate_matrix[,c("Sex","Age when attended assessment centre","Body mass index (BMI)","BMI","Standing height")]
+simple_covs = covariate_matrix[,c("Sex","Age when attended assessment centre","Body mass index (BMI)","Standing height")]
 fitness_vs_covs_lm_objects = list()
 for (fitness_score_ind in 1:ncol(fitness_scores_matrix)){
   y = fitness_scores_matrix[,fitness_score_ind]
@@ -329,6 +333,35 @@ for (j in 1:ncol(accelerometry_scores)){
   plot(y[names(lm1[[1]]$residuals)],lm1[[1]]$residuals,ylab="Residual",xlab="Fitness score")
   accelerometry_scores_to_residuals[[currname]] = lm1[[1]]$residuals
   save(accelerometry_scores_to_residuals,file="accelereometry_analysis_score_vs_covs_residuals_conservative.RData")
+}
+
+# Add the categorical accelerometry data
+accelerometry_scores_discrete = read.delim(
+  "accelerometry_phenotypes_anna/accelerometery_aggregate_phenotypes.categorical.filtered.txt",row.names = 1)
+accelerometry_scores_discrete = accelerometry_scores_discrete[,-1]
+colnames(accelerometry_scores_discrete)
+# Simple
+simple_covs = covariate_matrix[,c("Sex","Age when attended assessment centre","Body mass index (BMI)","Standing height")]
+disc_accl_residual_scores = list()
+for (j in 1:ncol(accelerometry_scores_discrete)){
+  y = as.numeric(accelerometry_scores_discrete[,j])
+  names(y) = rownames(accelerometry_scores_discrete)
+  currname = colnames(accelerometry_scores_discrete)[j]
+  lm1 = get_lm_residuals(y,simple_covs,use_categorical=T,max_num_classes=20,feature_is_numeric=feature_is_numeric,maxp=100000)
+  plot(y[names(lm1[[1]]$residuals)],lm1[[1]]$residuals,ylab="Residual",xlab="Fitness score")
+  disc_accl_residual_scores[[currname]] = lm1[[1]]$residuals
+  save(disc_accl_residual_scores,file="disc_accl_residual_scores_simple.RData")
+}
+# Conservative
+disc_accl_residual_scores = list()
+for (j in 1:ncol(accelerometry_scores_discrete)){
+  y = as.numeric(accelerometry_scores_discrete[,j])
+  names(y) = rownames(accelerometry_scores_discrete)
+  currname = colnames(accelerometry_scores_discrete)[j]
+  lm1 = get_lm_residuals(y,covariate_matrix,use_categorical=T,max_num_classes=20,feature_is_numeric=feature_is_numeric)
+  plot(y[names(lm1[[1]]$residuals)],lm1[[1]]$residuals,ylab="Residual",xlab="Fitness score")
+  disc_accl_residual_scores[[currname]] = lm1[[1]]$residuals
+  save(disc_accl_residual_scores,file="disc_accl_residual_scores_conservative.RData")
 }
 
 ###############################################

@@ -132,8 +132,9 @@ try({library('impute')})
 # and a set of covariates
 # OPTIONAL filter - additional_subcategories_to_exclude - which covariate categories to exclude
 # feature2subcategory - a mapping of covariates into categories
+# ... - parameters for knn.impute
 get_lm_residuals<-function(y,covs,use_categorical=T,max_num_classes=5, max_allowed_na_per = 0.2,
-                           feature_is_numeric,additional_subcategories_to_exclude=NULL){
+                           feature_is_numeric,additional_subcategories_to_exclude=NULL,...){
   inds = !is.na(y)
   if(!is.null(additional_subcategories_to_exclude)){
     col_inds = !is.element(colnames(covs),set=additional_subcategories_to_exclude)
@@ -143,9 +144,10 @@ get_lm_residuals<-function(y,covs,use_categorical=T,max_num_classes=5, max_allow
   covs = covs[names(y),]
   x = covs[,feature_is_numeric[colnames(covs)]]
   x = as.matrix(x)
+  print(dim(x))
   mode(x) = 'numeric'
   print ("Imputing missing values in numeric part")
-  x_imp = impute.knn(x)$data
+  x_imp = impute.knn(x,...)$data
   print ("Done imputing missing values in numeric part")
   
   if(use_categorical && sum(!feature_is_numeric[colnames(covs)])>0){
@@ -167,7 +169,7 @@ get_lm_residuals<-function(y,covs,use_categorical=T,max_num_classes=5, max_allow
       if(length(fx_mat)==0){next}
       new_x2 = cbind(new_x2,fx_mat)
     }
-    x2_imp = impute.knn(new_x2)$data
+    x2_imp = impute.knn(new_x2,...)$data
     print("Done creating the discrete covariate matrix for the regression analysis")
     print(dim(x2_imp))
     x_imp = cbind(x_imp,x2_imp)

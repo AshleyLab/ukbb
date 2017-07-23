@@ -102,6 +102,25 @@ corrs = get_pairwise_corrs(final_mat[,1:20])
 corrplot(corrs,order='hclust')
 save(final_mat,file="physical_activity_scores_for_GWAS.RData")
 
+# The categorical data
+# Conservative
+file = "disc_accl_residual_scores_conservative.RData"
+obj = get(load(file))
+scores = lapply(obj,get_score_from_object)
+scores_mat_consv = merge_scores_list_into_matrix(scores)
+colnames(scores_mat_consv) = paste(colnames(scores_mat_consv),"_conservative",sep='')
+# Simple
+file = "disc_accl_residual_scores_simple.RData"
+obj = get(load(file))
+scores = lapply(obj,get_score_from_object)
+scores_mat_simp = merge_scores_list_into_matrix(scores)
+colnames(scores_mat_simp) = paste(colnames(scores_mat_simp),"_simple",sep='')
+final_mat = cbind(scores_mat_simp,scores_mat_consv)
+print(dim(final_mat))
+corrs = get_pairwise_corrs(final_mat[,1:20])
+corrplot(corrs,order='hclust')
+save(final_mat,file="discrete_physical_activity_scores_for_GWAS.RData")
+
 ###############################################
 ###############################################
 #################### End ######################
@@ -149,6 +168,38 @@ save(final_mat,file="additional_scores_for_GWAS.RData")
 library(corrplot)
 corrs = get_pairwise_corrs(final_mat)
 corrplot(corrs,order='hclust')
+
+# Merge matrices
+l = list()
+l[["additional"]] = get(load("additional_scores_for_GWAS.RData"))
+l[["fitness"]] = get(load("physical_fitness_scores_for_GWAS.RData"))
+all_pheno_mat = merge_scores_matriceslist_into_matrix(l)
+dim(all_pheno_mat)
+save(all_pheno_mat,file="all_pheno_mat_for_GWAS.RData")
+
+# Assumes that column names across all matrices are unique
+merge_scores_matriceslist_into_matrix<-function(l){
+  rows = unique(unlist(sapply(l,rownames)))
+  cols = unlist(sapply(l,colnames))
+  m = matrix(NA,nrow=length(rows),ncol=length(cols))
+  colnames(m) = cols
+  rownames(m) = rows
+  for(j in 1:length(l)){
+    x = l[[j]]
+    m[rownames(x),colnames(x)]=x
+  }
+  return(m)
+}
+
+# Sanity checks
+table(is.na(all_pheno_mat[,15]))
+table(is.na(l[[2]][,5]))
+x1 = all_pheno_mat[,15]
+x2 = l[[2]][,5]
+inter = intersect(names(x1),names(x2))
+all(x1[inter]==x2[inter],na.rm=T)
+all(is.na(x1[inter])==is.na(x2[inter]))
+plot(x1[inter],x2[inter])
 
 ###############################################
 ###############################################
