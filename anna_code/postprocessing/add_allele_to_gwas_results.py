@@ -31,15 +31,19 @@ def annotate(fname,freq_dict):
     else: 
         outf.write('\t'.join(header)+'\tA1\tA2\n') 
     for line in data[1::]:
-        tokens=line.split()
-        cur_freqs=freq_dict[tokens[snp_index]]
-        if (a2_only==True):
-            a1=tokens[a1_index]
-            cur_freqs.remove(a1) 
-            outf.write('\t'.join(tokens)+'\t'+'\t'.join(cur_freqs)+'\n')
-        else:
-            outf.write('\t'.join(tokens)+'\t'+'\t'.join(cur_freqs)+'\n')        
-                   
+        try:
+            tokens=line.split()
+            cur_freqs=freq_dict[tokens[snp_index]]
+            if (a2_only==True):
+                if cur_freqs[0]==tokens[a1_index]:
+                    a2=cur_freqs[1]
+                else:
+                    a2=cur_freqs[0] 
+                outf.write('\t'.join(tokens)+'\t'+a2+'\n')
+            else:
+                outf.write('\t'.join(tokens)+'\t'+'\t'.join(cur_freqs)+'\n')        
+        except:
+            print("WARNING! Skipping line:"+line)
 def main():
     args=parse_args()
     #read in the frequency information
