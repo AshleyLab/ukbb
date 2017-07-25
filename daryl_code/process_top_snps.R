@@ -29,10 +29,12 @@ for (pheno in phenos) {
 ### loop over files
 cat("* finding the the snp with min p in a window\n")
 for (top.snp.file in top.snp.files) {
-
+print(top.snp.file)
+    if (file.info(top.snp.file)$size == 0) {next()}
     top.snp <- read.table(top.snp.file,header=F,as.is=T,sep=" ")
     colnames(top.snp) <- c("chr","snp","pos","a1","model","nmiss","effect","stat","pvalue")
     top.snp <- top.snp[top.snp[,9]!=0,]
+    if (nrow(top.snp) == 0) {next()}
     trait <- gsub("^top.", "", basename(top.snp.file))
     top.snp$trait <- trait
     print(trait)
