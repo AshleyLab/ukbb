@@ -1,1 +1,1 @@
-/oak/stanford/groups/euan/projects/ukbb/gwas/accelerometry_plink/v2/results/0_1/0_1.18.continuous.assoc.linear
+/oak/stanford/groups/euan/projects/ukbb/gwas/accelerometry_plink/v2/results/JobInvolvesHeavyManualOrPhysicalWork/JobInvolvesHeavyManualOrPhysicalWork.18.categorical.qassoc
