@@ -29,16 +29,23 @@ for (pheno in phenos) {
 ### loop over files
 cat("* finding the the snp with min p in a window\n")
 for (top.snp.file in top.snp.files) {
-print(top.snp.file)
     if (file.info(top.snp.file)$size == 0) {next()}
     top.snp <- read.table(top.snp.file,header=F,as.is=T,sep=" ")
     colnames(top.snp) <- c("chr","snp","pos","a1","model","nmiss","effect","stat","pvalue")
-    top.snp <- top.snp[top.snp[,9]!=0,]
+    top.snp <- top.snp[top.snp[,9]>1e-100,]
     if (nrow(top.snp) == 0) {next()}
     trait <- gsub("^top.", "", basename(top.snp.file))
     top.snp$trait <- trait
     print(trait)
-     
+   
+    ### add flag for conservative and ethnicity
+    is.simple <- grepl("simple",top.snp$trait) 
+    top.snp[is.simple,"score_adjustment"] <- "simple"
+    top.snp[!is.simple,"score_adjustment"] <- "conservative"
+    is.euro <- grepl("euro",top.snp$trait) 
+    top.snp[is.simple,"ancestry"] <- "european"
+    top.snp[!is.simple,"ancestry"] <- "non-europeaan"
+
     dist <- c(0,top.snp[2:nrow(top.snp),3] - top.snp[1:nrow(top.snp)-1,3])
     change.chr <-  c(T,top.snp[2:nrow(top.snp),1] != top.snp[1:nrow(top.snp)-1,1]) 
     dist[change.chr] <- 0
@@ -49,6 +56,9 @@ print(top.snp.file)
         regions <- c(regions,region)
         }
     top.snp$region <- regions 
+
+    ### write alls snps as a bed file for great
+    #write.table(, "top.snps.all.bed", quote=F,sep="\t",row.names=F)
 
     ### select the top snp by region include phenotype flag
     top.snp.filter <- by(top.snp,top.snp$region,function(x){n.snps <- nrow(x); start <- x[1,3]; end <- x[nrow(x),3];size <- x[nrow(x),3]-x[1,3]; x <- x[which.min(x[,9]),]; x$start <- start; x$end <- end; x$size <- size; x$n.snps <- n.snps; x})
