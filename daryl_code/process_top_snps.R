@@ -43,8 +43,8 @@ for (top.snp.file in top.snp.files) {
     top.snp[is.simple,"score_adjustment"] <- "simple"
     top.snp[!is.simple,"score_adjustment"] <- "conservative"
     is.euro <- grepl("euro",top.snp$trait) 
-    top.snp[is.simple,"ancestry"] <- "european"
-    top.snp[!is.simple,"ancestry"] <- "non-europeaan"
+    top.snp[is.euro,"ancestry"] <- "european"
+    top.snp[!is.euro,"ancestry"] <- "non-europeaan"
 
     dist <- c(0,top.snp[2:nrow(top.snp),3] - top.snp[1:nrow(top.snp)-1,3])
     change.chr <-  c(T,top.snp[2:nrow(top.snp),1] != top.snp[1:nrow(top.snp)-1,1]) 
@@ -79,33 +79,43 @@ for (i in 1:nrow(top.snp.combined)) {
     if (!file.exists(out.file)) {
         system(cmd,intern=F)
     }
-    freq <- scan(out.file)
+    freq <- scan(out.file,quiet=T)
     top.snp.combined[i,"freq"] <- freq
-    print(paste(snp,freq))
+    #print(paste(snp,freq))
 }
-
+options(warn=1)
 ### add pvalues from other phenotypes
 cat("* adding pvalues from other traits\n")
 for (i in 1:nrow(top.snp.combined)) {
     chr <- top.snp.combined[i,"chr"]
     snp <- top.snp.combined[i,"snp"]
     out.file <- paste0("top_gwas/tmp.",top.snp.combined[i,"snp"])
-    if (!file.exists(out.file)) {
+    p <- rep(NA,length(phenos))
+    names(p) <- phenos
+    if (!file.exists(out.file) | file.info(out.file)$size == 0) {
         cmd <- paste0("grep -w ", snp, " ", dir.to.search, "/", "*chr",chr,"*", "assoc.linear | tr -s ' ' | sed 's/^ //' > ", out.file)
         system(cmd)
     }
-    hits <- read.table(out.file, header=F, as.is=T,sep=" ")
-    phenos <- basename(gsub(".chr.*assoc.linear","",hits[,1]))
-    phenos <- gsub(":","",phenos)
-    p <- hits[,10]
-    names(p) <- phenos
+    hits <- read.table(out.file, header=F, as.is=T,sep=" ") 
+    phenos.tmp <- basename(gsub(".chr.*assoc.linear","",hits[,1]))
+    phenos.tmp <- gsub(":","",phenos.tmp)
+    p.tmp <- hits[,10]
+    names(p.tmp) <- phenos.tmp
+    na.omit(p.tmp)
+    ### not all traits are found so need to make the order consistent
+    #print(names(p))
+    #print(names(p.tmp))
+    p[match(names(p.tmp), names(p))] <- p.tmp
+
     if (i == 1) {
         ps <- matrix(p,nrow=1)
         colnames(ps) <- phenos
     } else {
+        print(snp)
+        dim(ps); dim(p)
         ps <- rbind(ps, p)
     }
-    print(snp)
+    #print(snp)
 }
 
 top.snp.combined <- cbind.data.frame(top.snp.combined, ps)
@@ -131,7 +141,8 @@ top.snp.combined$gwascat.hits <- gwascat.hits
 
 top.snp.bed <- data.frame(paste0("chr",top.snp.combined[,1]), top.snp.combined[,3]-1,top.snp.combined[,3],top.snp.combined[,2])
 write.table(top.snp.combined, "top.snps.tsv", quote=F,sep="\t",row.names=F)
-write.table(top.snp.bed, "top.snps.bed", quote=F,sep="\t",row.names=F)
+write.table(top.snp.bed, "top.snps.bed", quote=F,sep="\t",row.names=F,col.names=F)
+write.table(top.snp.bed[!grepl("grip|Spirometry",top.snp.combined$trait),], "top.snps.only.fitness.bed", quote=F,sep="\t",row.names=F,col.names=F)
 write.xlsx(top.snp.combined, "top.snps.xlsx", sheetName="top.snps",  col.names=TRUE, row.names=TRUE, append=FALSE, showNA=TRUE)
 
 ### loop over files again to get union of snps from all phenotypes
@@ -139,5 +150,5 @@ write.xlsx(top.snp.combined, "top.snps.xlsx", sheetName="top.snps",  col.names=T
 ### annotate (all hits http://www.snp-nexus.org/)
 
 ### review if any secondary hits increase in priority based on annotation
-
+#print(warnings())
 ### add any secondary hits to the minpvalue list and take these forward
