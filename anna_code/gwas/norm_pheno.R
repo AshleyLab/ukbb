@@ -3,7 +3,8 @@ library(ggplot2)
 library(preprocessCore)
 
 #read in matrix of phenotype traits; first 2 columns are FID & IID 
-raw_pheno=read.table("accelerometery_aggregate_phenotypes.continuous.filtered.txt",header=TRUE,sep='\t')
+#raw_pheno=read.table("accelerometery_aggregate_phenotypes.continuous.filtered.txt",header=TRUE,sep='\t')
+raw_pheno=read.table("accelerometery_aggregate_phenotypes.DurationVigorous.Activity.txt.continuous.txt",header=TRUE,sep='\t')
 cols=ncol(raw_pheno)
 rows=nrow(raw_pheno)
 
