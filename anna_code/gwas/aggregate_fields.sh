@@ -7,8 +7,12 @@
 
 
 #ETHNIC BACKGROUND
+#python aggregate_fields.py --tables  /scratch/PI/euan/projects/ukbb/data/bulk_data/ukb7454.tab  \
+#       --fields /scratch/PI/euan/projects/ukbb/code/anna_code/gwas/ethnicity.fields  \
+#       --outf /scratch/PI/euan/projects/ukbb/gwas/accelerometry_plink/v1/ethnicity_aggregate_phenotypes
 
-python aggregate_fields.py --tables  /scratch/PI/euan/projects/ukbb/data/bulk_data/ukb7454.tab  \
-       --fields /scratch/PI/euan/projects/ukbb/code/anna_code/gwas/ethnicity.fields  \
-       --outf /scratch/PI/euan/projects/ukbb/gwas/accelerometry_plink/v1/ethnicity_aggregate_phenotypes
 
+#DURATION OF VIGOROUS ACTIVITY
+python aggregate_fields.py --tables /oak/stanford/groups/euan/projects/ukbb/data/bulk_data/ukb7454.tab \
+       --fields /oak/stanford/groups/euan/projects/ukbb/code/anna_code/gwas/duration.vigorous.activity.fields \
+       --outf accelerometery_aggregate_phenotypes.DurationVigorous.Activity.txt
