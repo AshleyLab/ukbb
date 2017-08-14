@@ -524,21 +524,38 @@ all(is.na(x1)==is.na(x2))
 ############### Merge scores ##################
 ###############################################
 ###############################################
+source("auxiliary_functions.R")
+load("fitness_analysis_data_slice2fitness_score_objects.RData")
 
 par(mfrow=c(2,2))
 HR_ratios = lapply(data_slice2fitness_score_objects,function(x)x$HR_ratios[,2])
-HR_ratios_merged = merge_scores_list(HR_ratios,main = "Rest HR ratios after 60sec")
+HR_ratios_merged = merge_scores_set(HR_ratios,main = "Rest HR ratios after 60sec")
+HR_ratios_classes = merge_scores_set(HR_ratios,main = "Rest HR ratios after 60sec",get_subj_classes = T)
 HR_pred_WDs = lapply(data_slice2fitness_score_objects,function(x)x$HR_pred_WD[,2])
-HR_pred_WDs_merged = merge_scores_list(HR_pred_WDs,main="Predicted HR at WD=100")
+HR_pred_WDs_merged = merge_scores_set(HR_pred_WDs,main="Predicted HR at WD=100")
+HR_pred_WDs_classes = merge_scores_set(HR_pred_WDs,main="Predicted HR at WD=100",get_subj_classes = T)
 HR_WD_slopes = lapply(data_slice2fitness_score_objects,function(x)x$slopes)
-HR_WD_slopes_merged = merge_scores_list(HR_WD_slopes,main="Regression slopes")
+HR_WD_slopes_merged = merge_scores_set(HR_WD_slopes,main="Regression slopes")
 max_WDs = lapply(data_slice2fitness_score_objects,function(x)x$max_WDs)
-max_WDs_merged = merge_scores_list(max_WDs,main="Max achieved WD")
+max_WDs_merged = merge_scores_set(max_WDs,main="Max achieved WD")
+max_WDs_classes = merge_scores_set(max_WDs,main="Max achieved WD",get_subj_classes = T)
 
 # Check before merging into one matrix:
 all(rownames(HR_ratios_merged) == rownames(HR_pred_WDs_merged))
 all(rownames(HR_ratios_merged) == rownames(HR_WD_slopes_merged))
 all(rownames(HR_ratios_merged) == rownames(max_WDs_merged))
+all(rownames(HR_ratios_merged) == names(max_WDs_classes))
+
+# get the classes
+table(HR_pred_WDs_classes,HR_ratios_classes)
+table(max_WDs_classes,HR_ratios_classes)
+table(is.na(max_WDs_classes),is.na(HR_ratios_classes))
+# Get the classes, print into a text file for usage in plink
+is_category_2 = 1-t(t(as.numeric(grepl(max_WDs_classes,pattern="Category 1"))))
+is_category_2 = cbind(names(max_WDs_classes),names(max_WDs_classes),is_category_2)
+table(is_category_2[,3])
+colnames(is_category_2) = c("FID","IID","IsCategory2")
+write.table(is_category_2,row.names = F,file="is_category_2_fitness_subjects.txt",sep="\t",quote = F, col.names = T)
 
 fitness_scores_matrix = cbind(HR_ratios_merged$scores,
                               HR_pred_WDs_merged$scores,
@@ -594,6 +611,22 @@ get_pairwise_corrs(cbind(x1[inter],x2[inter]))
 #################### End ######################
 ###############################################
 ###############################################
+
+###############################################
+###############################################
+########## Main Figures and stats #############
+###############################################
+###############################################
+
+# Table 1: Demographics (subjects with time series datasets)
+# Sex, Age, BMI, Height, one of our scores
+# Table S1: Demographics (all subjects)
+# Sex, Age, BMI, Height, one of our scores
+
+# TODO 1: Load IDC9 data and check simple pairwise association
+# Do we need to correct?
+
+# 
 
 ###############################################
 ###############################################

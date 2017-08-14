@@ -54,6 +54,23 @@ get_pairwise_corrs<-function(x,...){
   }
   return(m)
 }
+get_pairwise_sizes<-function(x,jaccard=F){
+  n = ncol(x);cn = colnames(x);m = diag(0,n)
+  rownames(m) = cn; colnames(m) = cn
+  for(i in 1:n){
+    for(j in 1:i){
+      inds1 = !apply(is.na(x[,c(i,j)]),1,any) & !apply(is.nan(x[,c(i,j)]),1,any)
+      n1 = sum(inds1)
+      if(jaccard){
+        inds2 = apply(!is.na(x[,c(i,j)]),1,any) & apply(!is.nan(x[,c(i,j)]),1,any)
+        n2 = sum(inds2)
+        n1 = n1/n2
+      }
+      m[i,j] = n1; m[j,i]=n1
+    }
+  }
+  return(m)
+}
 
 # Analyze the workload and time patterns
 # Step 1: get the "hockey" sticks
@@ -289,7 +306,7 @@ get_rest_phase_fitness_score<-function(rest_data,rho_rest,rest_time = 60,
 }
 
 # A function that merges the results of the fitness scores computation
-merge_scores_set<-function(l,plot_class_averages = T,...){
+merge_scores_set<-function(l,plot_class_averages = T,get_subj_classes=F,...){
   all_subjects = c()
   for(x in l){
     all_subjects = union(all_subjects,names(x))
@@ -315,6 +332,7 @@ merge_scores_set<-function(l,plot_class_averages = T,...){
   scores[counts==0] = NA
   d = data.frame(scores=scores,classes=classes)
   if(plot_class_averages){plot.design(d,...)}
+  if(get_subj_classes){return(classes)}
   return(d)
 }
 
