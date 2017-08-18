@@ -79,6 +79,45 @@ additional_scores[['hand grip']] = pheno_data[,hand_grip_cols]
 ###############################################
 
 ###############################################
+#################### End ######################
+###############################################
+###############################################
+
+###############################################
+###############################################
+########### Print uncorrected data ############
+###############################################
+###############################################
+
+dir.create("uncorrected_fitness_scores/")
+euro_pcs = read.delim("pca_results_v2_chrom1_euro.eigenvec")
+euro_ids = as.character(euro_pcs$IID)
+colnames(fitness_scores_matrix) = c("Recovery","HR_fitnes","Exercise_slopes","MaxWD","CompletionStatus")
+
+# August 2017: print the scores as is
+fitness_eu_ids = intersect(rownames(fitness_scores_matrix),euro_ids)
+for(j in 1:ncol(fitness_scores_matrix)){
+  currname = paste("uncorrected_fitness_scores/",colnames(fitness_scores_matrix)[j],"_euro.txt",sep='')
+  m = cbind(fitness_eu_ids,fitness_eu_ids,fitness_scores_matrix[fitness_eu_ids,j])
+  colnames(m) = c("FID","IID",colnames(fitness_scores_matrix)[j])
+  write.table(m,file=currname,sep="\t",quote=F,row.names = F)
+}
+
+rhr_v = additional_scores$`Pulse rate`
+rhr_v = apply(rhr_v,1,mean,na.rm=T)
+rhr_v = rhr_v[!is.na(rhr_v)]
+rhr_eu_samples = intersect(names(rhr_v),euro_ids)
+currname = "uncorrected_fitness_scores/pulse_rate.txt"
+m = cbind(rhr_eu_samples,rhr_eu_samples,rhr_v[rhr_eu_samples])
+colnames(m) = c("FID","IID","RHR")
+write.table(m,file=currname,sep="\t",quote=F,row.names = F)
+
+###############################################
+#################### End ######################
+###############################################
+###############################################
+
+###############################################
 ###############################################
 ############## Filter features ################
 ###############################################
