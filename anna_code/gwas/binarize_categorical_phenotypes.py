@@ -23,9 +23,9 @@ def main():
             if v==args.missing:
                 outstring.append(str(int(v)))
             elif v > args.thresh:
-                outstring.append('1')
+                outstring.append('2')
             else:
-                outstring.append('0')
+                outstring.append('1')
         outf.write('\t'.join(outstring)+'\n')
 
 if __name__=="__main__":

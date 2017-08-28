@@ -3,13 +3,13 @@ library(ggplot2)
 library(preprocessCore)
 
 #read in matrix of phenotype traits; first 2 columns are FID & IID 
-#raw_pheno=read.table("accelerometery_aggregate_phenotypes.continuous.filtered.txt",header=TRUE,sep='\t')
-raw_pheno=read.table("accelerometery_aggregate_phenotypes.DurationVigorous.Activity.txt.continuous.txt",header=TRUE,sep='\t')
+raw_pheno=read.table("accelerometery_aggregate_phenotypes.continuous.txt",header=TRUE,sep='\t')
+#raw_pheno=read.table("accelerometery_aggregate_phenotypes.DurationVigorous.Activity.txt.continuous.txt",header=TRUE,sep='\t')
 cols=ncol(raw_pheno)
 rows=nrow(raw_pheno)
 
 #replace -1000 with NA for correct ranking behavior 
-raw_pheno[raw_pheno==-1000]=NA
+#raw_pheno[raw_pheno==-1000]=NA
 
 #remove outliers more than 4 std dev away from the mean 
 num_sd_permitted=4
@@ -54,12 +54,12 @@ pheno2=round(pheno2,2)
 pheno3=pheno2
 pheno3[is.na(pheno3)]=-1000
 write.table(pheno2,file="accelerometery_continuous_features_quantile_normalized_no_outliers.tsv",row.names = FALSE,col.names=TRUE,quote=FALSE,sep='\t')
-browser() 
+#browser() 
 #sanity check -- scatter plots of original data w/ outliers removed vs. qnormed data 
-for(i in seq(3,cols))
-{
-  cur_trait=names(pheno2)[i]
-  png(filename=paste(cur_trait,'.png'))
-  smoothScatter(raw_pheno[,i],pheno2[,i],xlab="Original",ylab="Quantile Normalized",main=cur_trait)
-  dev.off() 
-}
+#for(i in seq(3,cols))
+#{
+#  cur_trait=names(pheno2)[i]
+#  png(filename=paste(cur_trait,'.png'))
+#  smoothScatter(raw_pheno[,i],pheno2[,i],xlab="Original",ylab="Quantile Normalized",main=cur_trait)
+#  dev.off() 
+#}
