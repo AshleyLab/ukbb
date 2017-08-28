@@ -5,6 +5,12 @@ try({setwd("/Users/david/Desktop/ukbb/")})
 source("auxiliary_functions.R")
 library(xlsx)
 
+gaus_norm<-function(x){
+  x_r = (rank(x)-0.5)/length(x)
+  x_n = qnorm(x_r)
+  return(x_n)
+}
+
 ###############################################
 ###############################################
 ############## Load feature data ##############
@@ -12,7 +18,7 @@ library(xlsx)
 ###############################################
 
 # define constants
-MAX_NUM_CATEGORIES_IN_DISCRETE_COVARIATE = 100
+MAX_NUM_CATEGORIES_IN_DISCRETE_COVARIATE = 50
 MIN_CLASS_SIZE_IN_DISCRETE_COVARIATE = 500
 
 # Load the preprocessed data and the pheno data
@@ -59,7 +65,7 @@ accelerometry_scores = accelerometry_scores[,-c(1:2)]
 accelerometry_scores_all_nas = apply(is.na(accelerometry_scores),1,all)
 table(accelerometry_scores_all_nas)
 accelerometry_scores = accelerometry_scores[!accelerometry_scores_all_nas,]
-
+# b. define a set of additional scores
 additional_scores = list()
 spiro_cols = extract_feature_cols_by_category(colnames(pheno_data),feature_code2name,feature_subcategory_data,"Spirometry")
 additional_scores[['Spirometry']] = pheno_data[,spiro_cols]
@@ -68,10 +74,22 @@ additional_scores[['DXA']] = pheno_data[,dxa_cols]
 impedence_cols = get_regex_cols(colnames(pheno_data),"Impedance",ignore.case=T)
 feature_category_data[feature_code2name[impedence_cols]]
 additional_scores[['Impedance']] = pheno_data[,impedence_cols]
-pulse_rate_cols = get_regex_cols(colnames(pheno_data),"pulse rate\\.",ignore.case=T)
-additional_scores[['Pulse rate']] = pheno_data[,pulse_rate_cols]
+pulse_rate_cols1 = get_regex_cols(colnames(pheno_data),"pulse rate\\.",ignore.case=T)
+additional_scores[['Pulse rate1']] = pheno_data[,pulse_rate_cols1]
+pulse_rate_cols2 = get_regex_cols(colnames(pheno_data),"pulse rate,",ignore.case=T)
+additional_scores[['Pulse rate2']] = pheno_data[,pulse_rate_cols2]
+additional_scores[['Pulse rate']] = cbind(additional_scores[['Pulse rate1']],additional_scores[['Pulse rate2']])
 hand_grip_cols = get_regex_cols(colnames(pheno_data),"Hand grip",ignore.case=T)
 additional_scores[['hand grip']] = pheno_data[,hand_grip_cols]
+rhr_v = additional_scores$`Pulse rate`
+rhr_v = as.matrix(rhr_v)
+mode(rhr_v) = 'numeric'
+rhr_v = rowMeans(rhr_v,na.rm=T)
+table(is.na(rhr_v))
+rhr_v = rhr_v[!is.na(rhr_v)]
+additional_scores[['Pulse rate']] = rhr_v
+
+save(fitness_scores_matrix,additional_scores,accelerometry_scores,file="all_traits_for_gwas.RData")
 
 ###############################################
 #################### End ######################
@@ -79,15 +97,11 @@ additional_scores[['hand grip']] = pheno_data[,hand_grip_cols]
 ###############################################
 
 ###############################################
-#################### End ######################
+###############################################
+###### Normalize (quantile) and print #########
 ###############################################
 ###############################################
-
-###############################################
-###############################################
-########### Print uncorrected data ############
-###############################################
-###############################################
+library(preprocessCore)
 
 dir.create("uncorrected_fitness_scores/")
 euro_pcs = read.delim("pca_results_v2_chrom1_euro.eigenvec")
@@ -96,20 +110,29 @@ colnames(fitness_scores_matrix) = c("Recovery","HR_fitnes","Exercise_slopes","Ma
 
 # August 2017: print the scores as is
 fitness_eu_ids = intersect(rownames(fitness_scores_matrix),euro_ids)
+par(mfrow=c(4,2))
 for(j in 1:ncol(fitness_scores_matrix)){
   currname = paste("uncorrected_fitness_scores/",colnames(fitness_scores_matrix)[j],"_euro.txt",sep='')
   m = cbind(fitness_eu_ids,fitness_eu_ids,fitness_scores_matrix[fitness_eu_ids,j])
+  hist(as.numeric(m[,3]),main=paste(colnames(fitness_scores_matrix)[j],"uncorrected"))
   colnames(m) = c("FID","IID",colnames(fitness_scores_matrix)[j])
+  write.table(m,file=currname,sep="\t",quote=F,row.names = F)
+  m[,3] = gaus_norm(as.numeric(m[,3]))
+  #plot(as.numeric(m[,3]),normalize.quantiles(as.matrix(as.numeric(m[,3])))) # sanity
+  hist(as.numeric(m[,3]),main="normalized")
+  currname = paste("uncorrected_fitness_scores/",colnames(fitness_scores_matrix)[j],"_qnorm_euro.txt",sep='')
   write.table(m,file=currname,sep="\t",quote=F,row.names = F)
 }
 
 rhr_v = additional_scores$`Pulse rate`
-rhr_v = apply(rhr_v,1,mean,na.rm=T)
-rhr_v = rhr_v[!is.na(rhr_v)]
 rhr_eu_samples = intersect(names(rhr_v),euro_ids)
-currname = "uncorrected_fitness_scores/pulse_rate.txt"
+currname = "uncorrected_fitness_scores/pulse_rate_euro.txt"
 m = cbind(rhr_eu_samples,rhr_eu_samples,rhr_v[rhr_eu_samples])
 colnames(m) = c("FID","IID","RHR")
+write.table(m,file=currname,sep="\t",quote=F,row.names = F)
+m[,3] = gaus_norm(as.numeric(m[,3]))
+hist(as.numeric(m[,3]))
+currname = "uncorrected_fitness_scores/pulse_rate_qnorm_euro.txt"
 write.table(m,file=currname,sep="\t",quote=F,row.names = F)
 
 ###############################################
@@ -123,8 +146,9 @@ write.table(m,file=currname,sep="\t",quote=F,row.names = F)
 ###############################################
 ###############################################
 
-# Define the sample set to work with: union of the above
+# Define the sample set to work with: union of the above and rhr
 subject_set = union(rownames(accelerometry_scores),rownames(fitness_scores_matrix))
+subject_set = union(subject_set,names(additional_scores$`Pulse rate`))
 
 # Filter 1: Define data column types to be excluded automatically
 categories_to_exclude = c("Cognitive function")
@@ -167,6 +191,7 @@ gc()
 
 # Filter 1.1: Features with 100% NAs in the resulting matrix (save some running time)
 percent_nas_col = colSums(is.na(pheno_data))/nrow(pheno_data)
+print(table(percent_nas_col<1))
 pheno_data = pheno_data[,percent_nas_col < 1]
 print(dim(pheno_data))
 gc()
@@ -180,7 +205,7 @@ pheno_data_feature2name["Weight.1.0.1"] = "Weight"
 pheno_data_feature2name["Body mass index (BMI).0.0.1"] = "Body mass index (BMI)"
 pheno_data_feature2name["Body mass index (BMI).1.0.1"] = "Body mass index (BMI)"
 
-# Filter 6: exclude categorical features with too many classes (>100) 
+# Filter 6: exclude categorical features with too many classes (>50) 
 # or that all classes are too small (<500)
 feature_is_numeric = c()
 for(j in 1:ncol(pheno_data)){
@@ -232,6 +257,7 @@ gc()
 
 # Filter 5: For covariate analysis, exclude features that are 20% NAs or higher
 features_to_exclude = apply(is.na(new_pheno_dat),2,sum)/nrow(new_pheno_dat) >= 0.2
+table(features_to_exclude)
 new_pheno_dat = new_pheno_dat[,!features_to_exclude]
 dim(new_pheno_dat)
 gc()
@@ -303,19 +329,128 @@ tmp_feature = get_regex_cols(colnames(covariate_matrix),"smok",ignore.case=T)[2]
 ###############################################
 ###############################################
 
+load("all_traits_for_gwas.RData")
+rhr_v = additional_scores[["Pulse rate"]]
+rm(additional_scores);gc()
+colnames(fitness_scores_matrix) = c("Recovery","HR_fitnes","Exercise_slopes","MaxWD","CompletionStatus")
 load("covariate_matrix.RData")
+external_covs = read.delim('covariates.augmented.txt')
+table(external_covs$PC1!=(-1000))
+# exclude samples with NAs in their PCs: these do not have genotypes
+external_covs = external_covs[external_covs$PC1!=(-1000),]
+pcs_matrix = external_covs[,grepl("^PC",colnames(external_covs))]
+rownames(pcs_matrix) = external_covs$IID
+batch_info = as.character(external_covs$f.batch)
+batch_info[batch_info==-1000] = NA
+pcs_matrix[pcs_matrix==-1000] = NA
+names(batch_info) = external_covs$IID
+table(is.na(batch_info))
+length(table(batch_info))
+# # Compare Anna's covariates to the ones computed above
+# sex1 = external_covs$Sex; names(sex1) = external_covs$IID
+# sex2 = covariate_matrix[,"Sex"]; names(sex2) = rownames(covariate_matrix)
+# sex_inters = intersect(names(sex1),names(sex2))
+# table(sex1[sex_inters],sex2[sex_inters])
+# Sex3: load the original pheno data
+# load("biobank_collated_pheno_data.RData")
+# Compare Anna's covariates to the ones computed above
+# sex3 = pheno_data[,"Sex.0.0"]; names(sex3) = rownames(pheno_data)
+# sex_inters = intersect(names(sex1),names(sex3))
+# table(sex1[sex_inters],sex3[sex_inters])
+# table(sex3[sex_inters],sex2[sex_inters])
+# Compare the age
+# age1 = external_covs$YearOfBirth;names(age1)=external_covs$IID
+# age2 = covariate_matrix[,"Age when attended assessment centre"]
+# names(age2) = rownames(covariate_matrix)
+# sex_inters = sample(intersect(names(sex1),names(sex2)))[1:10000]
+# plot(age1[sex_inters],age2[sex_inters])
+# # Compare BMI
+# bmi1 = external_covs$BMI;names(bmi1) = external_covs$IID
+# bmi1[bmi1==-1000] = NA
+# bmi2 = covariate_matrix[,"Body mass index (BMI)"];names(bmi2) = rownames(covariate_matrix)
+# plot(bmi1[sex_inters],bmi2[sex_inters])
 
-# Simple analysis
-simple_covs = covariate_matrix[,c("Sex","Age when attended assessment centre","Body mass index (BMI)","Standing height")]
+# merge the covariates and the pcs
+names_inters = intersect(rownames(pcs_matrix),rownames(covariate_matrix))
+covariate_matrix = cbind(covariate_matrix[names_inters,],pcs_matrix[names_inters,],batch_info[names_inters])
+colnames(covariate_matrix)[ncol(covariate_matrix)] = "batch"
+pc_names = colnames(pcs_matrix)
+feature_is_numeric[pc_names]=T
+feature_is_numeric["batch"] = F
+covariate_matrix[,"batch"] = as.character(covariate_matrix[,"batch"])
+
+# For printing a scores vector for gwas
+print_scores_vector_for_gwas<-function(v,fname){
+  nn = names(v)
+  m = cbind(nn,nn,v)
+  colnames(m) = c("FID","IID","RHR")
+  write.table(m,file=fname,sep="\t",quote=F,row.names = F)
+}
+
+# For the fitness analysis only: get the category of the subjects
+load("biobank_collated_pheno_data.RData")
+category_matrix = pheno_data[rownames(fitness_scores_matrix),get_regex_cols(colnames(pheno_data),"category")]
+cat_order = c("No category, ECG not to be done",
+              "Category 4, at-rest measurement",
+              "Category 3, cycle at constant level",
+              "Category 2, cycle rising to 35% level",
+              "Category 1, cycle rising to 50% level"
+              )
+cat_order = cat_order[length(cat_order):1]
+get_disc_cat <- function(x,y){
+  if(all(is.na(x))){return(NA)}
+  return(which(is.element(y,set=x[!is.na(x)]))[1])
+}
+category_disc = apply(category_matrix,1,get_disc_cat,y=cat_order)
+table(category_disc)
+test_subjs = rownames(fitness_scores_matrix)[!is.na(fitness_scores_matrix[,2])]
+table(category_disc[test_subjs])
+plot(fitness_scores_matrix[test_subjs,2],category_disc[test_subjs])
+# look at the false rows
+category_discs_rows = category_matrix[!category_discs,]
+
+
+# Four possible GWAS runs:
+# Simple vs Simpler analyses
+# Outlier removal vs. qnorm
+simple_covs = covariate_matrix[,c("Sex","Age when attended assessment centre","Body mass index (BMI)","Standing height",pc_names,"batch")]
+simple_covs[,"Sex"] = as.numeric(as.factor(simple_covs[,"Sex"]))-1
+feature_is_numeric["Sex"]=T
+simpler_covs = simple_covs[,c("Sex","Age when attended assessment centre",pc_names,"batch")]
 fitness_vs_covs_lm_objects = list()
-for (fitness_score_ind in 1:ncol(fitness_scores_matrix)){
+r2_table = c()
+dir.create("gwas/simple_unnorm/");dir.create("gwas/simple_norm/")
+dir.create("gwas/simpler_unnorm/");dir.create("gwas/simpler_norm/")
+for (fitness_score_ind in 1:ncol(fitness_scores_matrix[,-1])){
   y = fitness_scores_matrix[,fitness_score_ind]
+  y = y[!is.na(y)]
+  y_stand = (y-mean(y,na.rm=T))/sd(y,na.rm=T)
+  y_norm = gaus_norm(as.numeric(y));names(y_norm) = names(y)
   currname = colnames(fitness_scores_matrix)[fitness_score_ind]
-  lm1 = get_lm_residuals(y,simple_covs,use_categorical=T,max_num_classes=20,feature_is_numeric=feature_is_numeric)
-  plot(y[names(lm1[[1]]$residuals)],lm1[[1]]$residuals,ylab="Residual",xlab="Fitness score")
+  y = y[abs(y_stand)<6]
+  par(mfrow=c(2,1));hist(y);hist(y_norm)
+  lm1 = get_lm_residuals(y,simple_covs[names(y),],use_categorical=T,max_num_classes=150,feature_is_numeric=feature_is_numeric)
+  lm2 = get_lm_residuals(y,simpler_covs[names(y),],use_categorical=T,max_num_classes=150,feature_is_numeric=feature_is_numeric)
+  lm3 = get_lm_residuals(y_norm,simple_covs[names(y_norm),],use_categorical=T,max_num_classes=150,feature_is_numeric=feature_is_numeric)
+  lm4 = get_lm_residuals(y_norm,simpler_covs[names(y_norm),],use_categorical=T,max_num_classes=150,feature_is_numeric=feature_is_numeric)
+  res1 = lm1$lm_obj$residuals
+  res2 = lm2$lm_obj$residuals
+  res3 = lm3$lm_obj$residuals
+  res4 = lm4$lm_obj$residuals
+  print_scores_vector_for_gwas(res1,paste("gwas/simple_unnorm/",currname,".txt",sep=''))
+  print_scores_vector_for_gwas(res2,paste("gwas/simpler_unnorm/",currname,".txt",sep=''))
+  print_scores_vector_for_gwas(res3,paste("gwas/simple_norm/",currname,".txt",sep=''))
+  print_scores_vector_for_gwas(res4,paste("gwas/simpler_norm/",currname,".txt",sep=''))
+  r2s = c(
+    get_lm_r2(lm1$lm_obj),get_lm_r2(lm2$lm_obj),get_lm_r2(lm3$lm_obj),get_lm_r2(lm4$lm_obj)
+  )
+  r2_table = rbind(r2_table,r2s)
+  rownames(r2_table)[nrow(r2_table)] = currname
+  #plot(y[names(lm1[[1]]$residuals)],lm1[[1]]$residuals,ylab="Residual",xlab="Fitness score")
   fitness_vs_covs_lm_objects[[currname]] = lm1
   save(fitness_vs_covs_lm_objects,file="fitness_analysis_fitness_vs_covs_lm_objects_simple.RData")
 }
+colnames(r2_table) = c("simple,unnorm","simpler,unnorm","simple,norm","simpler,unnorm")
 # Plot for the report: Figure S2.2 
 #load("fitness_analysis_fitness_vs_covs_lm_objects_simple.RData")
 par(mfrow=c(2,2))
@@ -328,6 +463,43 @@ for (fitness_score_ind in 1:ncol(fitness_scores_matrix)){
   plot(y[names(lm1[[1]]$residuals)],lm1[[1]]$residuals,ylab="Residual",xlab="Fitness score",
        main=paste(currname,", R^2=",r2_scores[fitness_score_ind],sep=""))
 }
+
+
+# new conservative analysis for fitness 
+conservative_colnames = c("Sex","Age when attended assessment centre",
+  "Body mass index (BMI)","Standing height",pc_names,"batch",
+  "Whole body water mass","Whole body fat mass","Smoking status",
+  "Current employment status", "Alcohol drinker status",
+  "Diabetes diagnosed by doctor", "Frequency of depressed mood in last 2 weeks",
+  "Frequency of unenthusiasm / disinterest in last 2 weeks", 
+  "Exposure to tobacco smoke at home", "Time spent using computer", "Time spent watching television (TV)"
+)
+conservative_covs = covariate_matrix[,conservative_colnames]
+conservative_feature_type = feature_is_numeric[conservative_colnames]
+cd = rep(NA,nrow(conservative_covs));names(cd)= rownames(conservative_covs)
+curr_subjs = intersect(names(category_disc),rownames(covariate_matrix))
+cd[curr_subjs] = category_disc[curr_subjs]
+conservative_covs = cbind(conservative_covs,cd)
+colnames(conservative_covs)[ncol(conservative_covs)] = "exercise_category"
+conservative_feature_type["exercise_category"] = F
+
+fitness_vs_covs_lm_objects_conservative = list()
+r2_cons = c()
+dir.create("gwas/conservative_norm/")
+for (fitness_score_ind in 1:ncol(fitness_scores_matrix[,-1])){
+  y = fitness_scores_matrix[,fitness_score_ind]
+  y = y[!is.na(y)]
+  y_norm = gaus_norm(as.numeric(y));names(y_norm) = names(y)
+  currname = colnames(fitness_scores_matrix)[fitness_score_ind]
+  lm1 = get_lm_residuals(y,conservative_covs[names(y),],use_categorical=T,max_num_classes=150,feature_is_numeric=conservative_feature_type)
+  res1 = lm1$lm_obj$residuals
+  print_scores_vector_for_gwas(res1,paste("gwas/conservative_norm/",currname,".txt",sep=''))
+  r2_cons[currname] = get_lm_r2(lm1$lm_obj)
+  fitness_vs_covs_lm_objects_conservative[[currname]] = lm1
+  save(fitness_vs_covs_lm_objects_conservative,file="fitness_analysis_fitness_vs_covs_lm_objects_conservative.RData")
+}
+
+# accelerometry analysis
 accelerometry_scores_to_residuals = list()
 for (j in 1:ncol(accelerometry_scores)){
   y = accelerometry_scores[,j]
@@ -339,17 +511,17 @@ for (j in 1:ncol(accelerometry_scores)){
   save(accelerometry_scores_to_residuals,file="accelereometry_analysis_score_vs_covs_residuals_simple.RData")
 }
 
-# Conservative analysis
+# # Conservative analysis
 # fitness_vs_covs_lm_objects = list()
-for (fitness_score_ind in 1:ncol(fitness_scores_matrix)){
-  y = fitness_scores_matrix[,fitness_score_ind]
-  currname = colnames(fitness_scores_matrix)[fitness_score_ind]
-  lm1 = get_lm_residuals(y,covariate_matrix,use_categorical=T,max_num_classes=20,feature_is_numeric=feature_is_numeric)
-  plot(y[names(lm1[[1]]$residuals)],lm1[[1]]$residuals,ylab="Residual",xlab="Fitness score")
-  fitness_vs_covs_lm_objects[[currname]] = lm1
-  save(fitness_vs_covs_lm_objects,file="fitness_analysis_fitness_vs_covs_lm_objects.RData")
-}
-r2_scores = sapply(fitness_vs_covs_lm_objects,function(x)summary(x$lm)[["r.squared"]])
+# for (fitness_score_ind in 1:ncol(fitness_scores_matrix)){
+#   y = fitness_scores_matrix[,fitness_score_ind]
+#   currname = colnames(fitness_scores_matrix)[fitness_score_ind]
+#   lm1 = get_lm_residuals(y,covariate_matrix,use_categorical=T,max_num_classes=20,feature_is_numeric=feature_is_numeric)
+#   plot(y[names(lm1[[1]]$residuals)],lm1[[1]]$residuals,ylab="Residual",xlab="Fitness score")
+#   fitness_vs_covs_lm_objects[[currname]] = lm1
+#   save(fitness_vs_covs_lm_objects,file="fitness_analysis_fitness_vs_covs_lm_objects.RData")
+# }
+# r2_scores = sapply(fitness_vs_covs_lm_objects,function(x)summary(x$lm)[["r.squared"]])
 
 # Plot for the report: Figure S2.2 
 par(mfrow=c(2,2))
@@ -490,7 +662,7 @@ analyze_associations_between_scores_and_covariates<-function(scores,subject_set,
     summary_table = rbind(summary_table,c(cov_name,cov_category,cov_summary_scores))
   }
   colnames(summary_table) = c("Feature","Category","MI-discretized","ChisqP-discretized",
-      "MI-NA fitness","ChisqP-NA fitness","Spearman rho","Spearman rho p","MI-NAs", "ChisqP-NAs")
+                              "MI-NA fitness","ChisqP-NA fitness","Spearman rho","Spearman rho p","MI-NAs", "ChisqP-NAs")
   return(summary_table)
 }
 # scores = fitness_scores_matrix[,1]

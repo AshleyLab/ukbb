@@ -196,6 +196,13 @@ get_lm_stats_with_covs<-function(x,y,covs){
   s = o["x",2]
   return(c(b,s))
 }
+gaus_norm<-function(x){
+  x_r = (rank(x)-0.5)/length(x)
+  x_n = qnorm(x_r)
+  return(x_n)
+}
+
+expo_v = gaus_norm(expo_v)
 
 # get betas and their sds, also merge snps based on betas
 # # multivariate
