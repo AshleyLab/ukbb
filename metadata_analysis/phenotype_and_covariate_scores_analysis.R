@@ -329,6 +329,10 @@ tmp_feature = get_regex_cols(colnames(covariate_matrix),"smok",ignore.case=T)[2]
 ###############################################
 ###############################################
 
+# Aug 2017: For now we use these only after correction
+euro_pcs = read.delim("pca_results_v2_chrom1_euro.eigenvec")
+euro_ids = as.character(euro_pcs$IID)
+
 load("all_traits_for_gwas.RData")
 rhr_v = additional_scores[["Pulse rate"]]
 rm(additional_scores);gc()
@@ -346,6 +350,8 @@ pcs_matrix[pcs_matrix==-1000] = NA
 names(batch_info) = external_covs$IID
 table(is.na(batch_info))
 length(table(batch_info))
+pcs_matrix = pcs_matrix[!apply(is.na(pcs_matrix),1,any),]
+gc()
 # # Compare Anna's covariates to the ones computed above
 # sex1 = external_covs$Sex; names(sex1) = external_covs$IID
 # sex2 = covariate_matrix[,"Sex"]; names(sex2) = rownames(covariate_matrix)
@@ -369,7 +375,6 @@ length(table(batch_info))
 # bmi1[bmi1==-1000] = NA
 # bmi2 = covariate_matrix[,"Body mass index (BMI)"];names(bmi2) = rownames(covariate_matrix)
 # plot(bmi1[sex_inters],bmi2[sex_inters])
-
 # merge the covariates and the pcs
 names_inters = intersect(rownames(pcs_matrix),rownames(covariate_matrix))
 covariate_matrix = cbind(covariate_matrix[names_inters,],pcs_matrix[names_inters,],batch_info[names_inters])
@@ -406,14 +411,18 @@ table(category_disc)
 test_subjs = rownames(fitness_scores_matrix)[!is.na(fitness_scores_matrix[,2])]
 table(category_disc[test_subjs])
 plot(fitness_scores_matrix[test_subjs,2],category_disc[test_subjs])
-# look at the false rows
-category_discs_rows = category_matrix[!category_discs,]
+rm(pheno_data); gc()
 
+# Added on September 2017: set the sample set to europeans only
+names_inters = intersect(rownames(covariate_matrix),euro_ids)
+covariate_matrix = covariate_matrix[names_inters,]
+fitness_scores_matrix = fitness_scores_matrix[intersect(rownames(fitness_scores_matrix),names_inters),]
+rhr_v = rhr_v[intersect(names(rhr_v),names_inters)]
 
 # Four possible GWAS runs:
 # Simple vs Simpler analyses
 # Outlier removal vs. qnorm
-simple_covs = covariate_matrix[,c("Sex","Age when attended assessment centre","Body mass index (BMI)","Standing height",pc_names,"batch")]
+simple_covs = covariate_matrix[,c("Sex","Age when attended assessment centre","Standing height",pc_names,"batch")]
 simple_covs[,"Sex"] = as.numeric(as.factor(simple_covs[,"Sex"]))-1
 feature_is_numeric["Sex"]=T
 simpler_covs = simple_covs[,c("Sex","Age when attended assessment centre",pc_names,"batch")]
@@ -450,7 +459,24 @@ for (fitness_score_ind in 1:ncol(fitness_scores_matrix[,-1])){
   fitness_vs_covs_lm_objects[[currname]] = lm1
   save(fitness_vs_covs_lm_objects,file="fitness_analysis_fitness_vs_covs_lm_objects_simple.RData")
 }
-colnames(r2_table) = c("simple,unnorm","simpler,unnorm","simple,norm","simpler,unnorm")
+colnames(r2_table) = c("simple,unnorm","simpler,unnorm","simple,norm","simpler,norm")
+
+# Add RHR to the simple norm
+rhr_y = gaus_norm(rhr_v)
+names(rhr_y) = names(rhr_v)
+rhr_y = rhr_y[intersect(names(rhr_y),rownames(simpler_covs))]
+currname = "RHR"
+non_nas_cov_subjs = rownames(simple_covs)[apply(is.na(simple_covs),1,sum)==0]
+rhr_y = rhr_y[intersect(names(rhr_y),non_nas_cov_subjs)]
+rhr_lm1 = get_lm_residuals(rhr_y,simple_covs[names(rhr_y),],use_categorical=T,max_num_classes=150,feature_is_numeric=feature_is_numeric)
+rhr_lm2 = get_lm_residuals(rhr_y,simpler_covs[names(rhr_y),],use_categorical=T,max_num_classes=150,feature_is_numeric=feature_is_numeric)
+res3 = rhr_lm1$lm_obj$residuals
+res3 = res3[intersect(euro_ids,names(res3))]
+res4 = rhe_lm2$lm_obj$residuals
+res4 = res4[intersect(euro_ids,names(res4))]
+print_scores_vector_for_gwas(res3,paste("gwas/simple_norm/",currname,".txt",sep=''))
+print_scores_vector_for_gwas(res4,paste("gwas/simpler_norm/",currname,".txt",sep=''))
+
 # Plot for the report: Figure S2.2 
 #load("fitness_analysis_fitness_vs_covs_lm_objects_simple.RData")
 par(mfrow=c(2,2))
@@ -464,11 +490,9 @@ for (fitness_score_ind in 1:ncol(fitness_scores_matrix)){
        main=paste(currname,", R^2=",r2_scores[fitness_score_ind],sep=""))
 }
 
-
 # new conservative analysis for fitness 
 conservative_colnames = c("Sex","Age when attended assessment centre",
-  "Body mass index (BMI)","Standing height",pc_names,"batch",
-  "Whole body water mass","Whole body fat mass","Smoking status",
+  "Standing height",pc_names,"batch","Smoking status",
   "Current employment status", "Alcohol drinker status",
   "Diabetes diagnosed by doctor", "Frequency of depressed mood in last 2 weeks",
   "Frequency of unenthusiasm / disinterest in last 2 weeks", 
@@ -476,12 +500,7 @@ conservative_colnames = c("Sex","Age when attended assessment centre",
 )
 conservative_covs = covariate_matrix[,conservative_colnames]
 conservative_feature_type = feature_is_numeric[conservative_colnames]
-cd = rep(NA,nrow(conservative_covs));names(cd)= rownames(conservative_covs)
-curr_subjs = intersect(names(category_disc),rownames(covariate_matrix))
-cd[curr_subjs] = category_disc[curr_subjs]
-conservative_covs = cbind(conservative_covs,cd)
-colnames(conservative_covs)[ncol(conservative_covs)] = "exercise_category"
-conservative_feature_type["exercise_category"] = F
+conservative_covs[,"Sex"] = as.numeric(as.factor(conservative_covs[,"Sex"]))-1
 
 fitness_vs_covs_lm_objects_conservative = list()
 r2_cons = c()
@@ -491,27 +510,31 @@ for (fitness_score_ind in 1:ncol(fitness_scores_matrix[,-1])){
   y = y[!is.na(y)]
   y_norm = gaus_norm(as.numeric(y));names(y_norm) = names(y)
   currname = colnames(fitness_scores_matrix)[fitness_score_ind]
-  lm1 = get_lm_residuals(y,conservative_covs[names(y),],use_categorical=T,max_num_classes=150,feature_is_numeric=conservative_feature_type)
+  curr_covs = conservative_covs[names(y_norm),]
+  curr_covs = curr_covs[,(colSums(is.na(curr_covs))/nrow(curr_covs)) < 0.2]
+  lm1 = get_lm_residuals(y_norm,curr_covs,
+                         use_categorical=T,max_num_classes=150,feature_is_numeric=conservative_feature_type)
   res1 = lm1$lm_obj$residuals
+  res1 = res1[intersect(euro_ids,names(res1))]
   print_scores_vector_for_gwas(res1,paste("gwas/conservative_norm/",currname,".txt",sep=''))
   r2_cons[currname] = get_lm_r2(lm1$lm_obj)
   fitness_vs_covs_lm_objects_conservative[[currname]] = lm1
   save(fitness_vs_covs_lm_objects_conservative,file="fitness_analysis_fitness_vs_covs_lm_objects_conservative.RData")
 }
 
-# accelerometry analysis
-accelerometry_scores_to_residuals = list()
-for (j in 1:ncol(accelerometry_scores)){
-  y = accelerometry_scores[,j]
-  names(y) = rownames(accelerometry_scores)
-  currname = colnames(accelerometry_scores)[j]
-  lm1 = get_lm_residuals(y,simple_covs,use_categorical=T,max_num_classes=20,feature_is_numeric=feature_is_numeric)
-  plot(y[names(lm1[[1]]$residuals)],lm1[[1]]$residuals,ylab="Residual",xlab="Fitness score")
-  accelerometry_scores_to_residuals[[currname]] = lm1[[1]]$residuals
-  save(accelerometry_scores_to_residuals,file="accelereometry_analysis_score_vs_covs_residuals_simple.RData")
-}
+# # accelerometry analysis
+# accelerometry_scores_to_residuals = list()
+# for (j in 1:ncol(accelerometry_scores)){
+#   y = accelerometry_scores[,j]
+#   names(y) = rownames(accelerometry_scores)
+#   currname = colnames(accelerometry_scores)[j]
+#   lm1 = get_lm_residuals(y,simple_covs,use_categorical=T,max_num_classes=20,feature_is_numeric=feature_is_numeric)
+#   plot(y[names(lm1[[1]]$residuals)],lm1[[1]]$residuals,ylab="Residual",xlab="Fitness score")
+#   accelerometry_scores_to_residuals[[currname]] = lm1[[1]]$residuals
+#   save(accelerometry_scores_to_residuals,file="accelereometry_analysis_score_vs_covs_residuals_simple.RData")
+# }
 
-# # Conservative analysis
+# Old conservative analysis
 # fitness_vs_covs_lm_objects = list()
 # for (fitness_score_ind in 1:ncol(fitness_scores_matrix)){
 #   y = fitness_scores_matrix[,fitness_score_ind]

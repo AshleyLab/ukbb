@@ -163,10 +163,14 @@ get_lm_residuals<-function(y,covs,use_categorical=T,max_num_classes=5, max_allow
   x = as.matrix(x)
   print(dim(x))
   mode(x) = 'numeric'
-  print ("Imputing missing values in numeric part")
-  x_imp = impute.knn(x,...)$data
-  print ("Done imputing missing values in numeric part")
-  
+  if(any(is.na(covs))){
+    print ("Imputing missing values in numeric part")
+    x_imp = impute.knn(x,...)$data
+    print ("Done imputing missing values in numeric part")
+  }
+  else{
+    x_imp = x
+  }
   if(use_categorical && sum(!feature_is_numeric[colnames(covs)])>0){
     x2 = covs[,!feature_is_numeric[colnames(covs)]]
     if(is.null(dim(x2))){x2=matrix(x2,ncol=1);colnames(x2)=colnames(covs[!feature_is_numeric[colnames(covs)]])}
@@ -186,7 +190,12 @@ get_lm_residuals<-function(y,covs,use_categorical=T,max_num_classes=5, max_allow
       if(length(fx_mat)==0){next}
       new_x2 = cbind(new_x2,fx_mat)
     }
-    x2_imp = impute.knn(new_x2,...)$data
+    if(any(is.na(new_x2))){
+      x2_imp = impute.knn(new_x2,...)$data
+    }
+    else{
+      x2_imp = new_x2
+    }
     print("Done creating the discrete covariate matrix for the regression analysis")
     print(dim(x2_imp))
     x_imp = cbind(x_imp,x2_imp)

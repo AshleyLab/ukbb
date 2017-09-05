@@ -104,7 +104,7 @@ simple_covs = covariate_matrix[,c("Sex","Age when attended assessment centre",pc
 simple_covs[,"Sex"] = as.numeric(as.factor(simple_covs[,"Sex"]))-1
 rm(external_covs);rm(pcs_matrix);rm(covariate_matrix);gc()
 
-# get the subject set of the analysis and reshape the data
+# For fitness: get the subject set of the analysis and reshape the data
 subjs = rownames(expo)
 if(is.null(subjs)){
   subjs = names(expo)
@@ -118,69 +118,136 @@ icd_data = icd_data[subjs,]
 simple_covs = simple_covs[subjs,]
 gc()
 
+# define the tested outcomes
+outcome_vs = list()
+outcome_vs[["heart_disease"]] = heart_disease_outcome
+outcome_vs[["hypertension"]] = hypertension_outcome
+outcome_vs[["overll disease"]] = as.numeric(rowSums(icd_data[
+  ,sapply(colnames(icd_data),nchar)==3 & grepl(colnames(icd_data),pattern="^(A|B|C|D|E|F|G|I|J|K|M)")
+  ]))
+names(outcome_vs[["overll disease"]]) = rownames(icd_data)
+outcome_vs[["rhr"]] = additional_scores$`Pulse rate`
+
 # Read the snp lists
 if(!IS_ACTIVITY){
   library(xlsx)
+  # dary'ls old summary table
   fitness_snp_data = as.matrix(read.xlsx2(snps_fitness_table,sheetIndex = 1))
-  fitness_snps = fitness_snp_data[fitness_snp_data[,"ancestry"]=="european" &
-      (grepl(fitness_snp_data[,"trait"],pattern="Predicted_HR") | grepl(fitness_snp_data[,"trait"],pattern="Rest"))& 
-      fitness_snp_data[,"score_adjustment"] == "conservative"
-      ,"snp"]
-  fitness_snps = fitness_snp_data[fitness_snp_data[,"ancestry"]=="european" &
-      (grepl(fitness_snp_data[,"trait"],pattern="Predicted_HR") | grepl(fitness_snp_data[,"trait"],pattern="Rest")) & 
+  snp_lists = list()
+  snp_lists[['fitness_hr']] = unique(fitness_snp_data[fitness_snp_data[,"ancestry"]=="european" &
+      (grepl(fitness_snp_data[,"trait"],pattern="Predicted_HR") | grepl(fitness_snp_data[,"trait"],pattern="slopes") | grepl(fitness_snp_data[,"trait"],pattern="Max_ach")) & 
+      fitness_snp_data[,"score_adjustment"] == "simple"
+      ,"snp"])
+  snp_lists[['exercise']] = unique(fitness_snp_data[fitness_snp_data[,"ancestry"]=="european" &
+      (grepl(fitness_snp_data[,"trait"],pattern="Predicted_HR")) & 
+      fitness_snp_data[,"score_adjustment"] == "simple"
+      ,"snp"])
+  snp_lists[['recovery']] = fitness_snp_data[fitness_snp_data[,"ancestry"]=="european" &
+      (grepl(fitness_snp_data[,"trait"],pattern="Rest")) & 
       fitness_snp_data[,"score_adjustment"] == "simple"
       ,"snp"]
+  # # New runs from august 2017
+  # snps_fitness_table = '/Users/David/Desktop/ukbb/gwas/daryl_clump/simple_norm_top.snps.xlsx'
+  # fitness_snps = unique(as.character(read.xlsx2(snps_fitness_table,sheetIndex = 1)$snp))
+  # snps_fitness_table = '/Users/David/Desktop/ukbb/gwas/daryl_clump/conservative_norm_top.snps.xlsx'
+  # fitness_snps = unique(as.character(read.xlsx2(snps_fitness_table,sheetIndex = 1)$snp))
+  print(length(intersect(fitness_snps,colnames(geno_data))))
+  
   # Fitness analysis: format all data to be on the same subjects
-  subjs = rownames(expo)[!is.na(expo[,2])]
-  subjs = intersect(subjs,rownames(geno_data))
-  expo_v = expo[subjs,2]
-  outcome_v = heart_disease_outcome[subjs]
-  # for sanity checks
-  outcome_v = diabetes_outcome[subjs]
-  # overal disease
-  outcome_v = as.numeric(rowSums(icd_data[
-      subjs,sapply(colnames(icd_data),nchar)==3 & grepl(colnames(icd_data),pattern="^(A|B|C|D|E|F|G|I|J|K|M)")
-    ]))
-  # vs rhr
-  outcome_v = additional_scores$`Pulse rate`[subjs]
-  table(outcome_v)
-  snps = geno_data[subjs,intersect(fitness_snps,colnames(geno_data))]
-  snps = as.matrix(snps)
-  dim(snps)
-  gc()
+  expo_vs = list()
+  expo_vs[["fitness_hr"]] = expo[,2]
+  expo_vs[["recovery"]] = expo[,1]
+  expo_vs = lapply(expo_vs,function(x)x[!is.na(x)])
+  expo_vs = lapply(expo_vs,gaus_norm)
+  
+  mr_analysis_res = list()
+  for(nn1 in names(snp_lists)){
+    for(nn2 in names(expo_vs)){
+      for(nn3 in names(outcome_vs)){
+        currname = paste(nn1,nn2,nn3,sep=",")
+        if(is.element(currname,set=names(mr_analysis_res))){next}
+        print(currname)
+        expo_v = expo_vs[[nn2]]
+        outcome_v = outcome_vs[[nn3]]
+        subjs = intersect(names(expo_v),rownames(geno_data))
+        subjs = intersect(names(outcome_v),subjs)
+        expo_v = expo_v[subjs]
+        outcome_v = outcome_v[subjs]
+        snp_l = snp_lists[[nn1]]
+        # get the snps table
+        snps = geno_data[subjs,intersect(snp_l,colnames(geno_data))]
+        snps = as.matrix(snps)
+        dim(snps)
+        gc()
+        mr_analysis_res[[currname]] = run_mr_analysis(expo_v,outcome_v,snps,covs=simple_covs)
+      }
+    }
+  }
 }
+sapply(mr_analysis_res,function(x)attr(x[["univar_ivw"]],"Pval")) 
+sapply(mr_analysis_res,function(x)attr(x[["multivar_egger"]],"Pvalue.Est"))
+sapply(mr_analysis_res,function(x)attr(x[["multivar_med"]],"Pvalue"))
 
-if(IS_ACTIVITY){
-  # Activity analysis: format all data to be on the same subjects
-  subjs = names(expo)
-  sort(colSums(icd_data[subjs,]))
-  subjs = intersect(subjs,rownames(geno_data))
-  expo_v = expo[subjs]
-  outcome_v = heart_disease_outcome[subjs]
-  table(outcome_v)
-  # vs fitness
-  outcome_v = heart_disease_outcome[subjs]
-  fitness_v = fitness_scores_matrix[,2]
-  fitness_v = fitness_v[!is.na(fitness_v)]
-  subjs = intersect(subjs,names(fitness_v))
-  expo_v = expo[subjs]
-  outcome_v = heart_disease_outcome[subjs]
-  #####
-  # general disease
-  outcome_v = as.numeric(rowSums(icd_data[
-    subjs,sapply(colnames(icd_data),nchar)==3 & grepl(colnames(icd_data),pattern="^(A|B|C|D|E|F|G|I|J|K|M)")
-    ]))
-  #####
-  snps = geno_data[subjs,]
-  snps = as.matrix(snps)
-  snps = snps[,apply(snps>0,2,sum,na.rm=T)>100]
-  dim(snps)
-  gc()
-  # sample snps for a better running time
-  original_snps = snps
-  samp = sample(1:ncol(original_snps))[1:500]
-  snps = original_snps[,samp]
-}
+names(mr_analysis_res)
+name1 = "fitness_hr,fitness_hr,heart_disease"
+name1 = "fitness_hr,fitness_hr,rhr"
+mr_in = mr_analysis_res[[name1]][["multivar_input"]]
+mr_plot(mr_in)
+mr_analysis_res[[name1]][["multivar_egger"]]
+mr_analysis_res[[name1]][["multivar_all"]]
+expo_v = expo_vs[["fitness_hr"]]
+outcome_v = outcome_vs[["rhr"]]
+subjs = intersect(names(expo_v),rownames(geno_data))
+subjs = intersect(names(outcome_v),subjs)
+expo_v = expo_v[subjs]
+outcome_v = outcome_v[subjs]
+snp_l = snp_lists[["fitness_hr"]]
+# get the snps table
+snps = geno_data[subjs,intersect(snp_l,colnames(geno_data))]
+snps = as.matrix(snps)
+covs = simple_covs[rownames(snps),]
+lm_res = apply(snps,2,get_lm_stats_with_covs,y=expo_v,covs=covs)
+bx = lm_res[1,]
+snps[is.na(snps)]=0
+weighted_causal_v = snps %*% bx
+
+d = data.frame(x=weighted_causal_v,y=outcome_v,z=expo_v)
+run_discrete_ci_test(d,5)$p.value
+
+d = data.frame(x=weighted_causal_v,y=expo_v,z=outcome_v)
+run_discrete_ci_test(d,5)$p.value
+
+# if(IS_ACTIVITY){
+#   # Activity analysis: format all data to be on the same subjects
+#   subjs = names(expo)
+#   sort(colSums(icd_data[subjs,]))
+#   subjs = intersect(subjs,rownames(geno_data))
+#   expo_v = expo[subjs]
+#   outcome_v = heart_disease_outcome[subjs]
+#   table(outcome_v)
+#   # vs fitness
+#   outcome_v = heart_disease_outcome[subjs]
+#   fitness_v = fitness_scores_matrix[,2]
+#   fitness_v = fitness_v[!is.na(fitness_v)]
+#   subjs = intersect(subjs,names(fitness_v))
+#   expo_v = expo[subjs]
+#   outcome_v = heart_disease_outcome[subjs]
+#   #####
+#   # general disease
+#   outcome_v = as.numeric(rowSums(icd_data[
+#     subjs,sapply(colnames(icd_data),nchar)==3 & grepl(colnames(icd_data),pattern="^(A|B|C|D|E|F|G|I|J|K|M)")
+#     ]))
+#   #####
+#   snps = geno_data[subjs,]
+#   snps = as.matrix(snps)
+#   snps = snps[,apply(snps>0,2,sum,na.rm=T)>100]
+#   dim(snps)
+#   gc()
+#   # sample snps for a better running time
+#   original_snps = snps
+#   samp = sample(1:ncol(original_snps))[1:500]
+#   snps = original_snps[,samp]
+# }
 
 get_lm_stats<-function(x,y){
   o = summary(lm(y~x))$coefficients
@@ -189,6 +256,9 @@ get_lm_stats<-function(x,y){
   return(c(b,s))
 }
 get_lm_stats_with_covs<-function(x,y,covs){
+  if(is.null(covs)){
+    return (get_lm_stats(x,y))
+  }
   d = data.frame(x,y,covs)
   d$batch = factor(d$batch)
   o = summary(lm(y~.,data=d))$coefficients
@@ -202,78 +272,43 @@ gaus_norm<-function(x){
   return(x_n)
 }
 
-expo_v = gaus_norm(expo_v)
-
-# get betas and their sds, also merge snps based on betas
-# # multivariate
-# lm_expo_vs_g = lm(expo_v~snps)
-# bx_obj = summary(lm_expo_vs_g)$coefficients
-# bx = bx_obj[-1,1]
-# bxse = bx_obj[-1,2]
-# lm_outcome_vs_g = lm(outcome_v~snps)
-# by_obj = summary(lm_outcome_vs_g)$coefficients
-# by = by_obj[-1,1]
-# byse = by_obj[-1,2]
-# univariate
-lm_res = apply(snps,2,get_lm_stats,y=expo_v)
-bx = lm_res[1,]
-bxse = lm_res[2,]
-lm_res = apply(snps,2,get_lm_stats,y=outcome_v)
-by = lm_res[1,]
-byse = lm_res[2,]
-# univariate with covs
-covs = simple_covs[rownames(snps),]
-lm_res = apply(snps,2,get_lm_stats_with_covs,y=expo_v,covs=covs)
-bx = lm_res[1,]
-bxse = lm_res[2,]
-lm_res = apply(snps,2,get_lm_stats_with_covs,y=outcome_v,covs=covs)
-by = lm_res[1,]
-byse = lm_res[2,]
-
-# # merge snps by beta and rerun
-snps[is.na(snps)]=0
-weighted_causal_v = snps %*% bx
-hist(weighted_causal_v)
-# lm_expo_vs_g = lm(expo_v~weighted_causal_v)
-# bx_obj = summary(lm_expo_vs_g)$coefficients
-# bx = bx_obj[-1,1]
-# bxse = bx_obj[-1,2]
-# lm_outcome_vs_g = lm(outcome_v~weighted_causal_v)
-# by_obj = summary(lm_outcome_vs_g)$coefficients
-# by = by_obj[-1,1]
-# byse = by_obj[-1,2]
-# 
-# # outcome vs exposure
-# o_v_e = glm(outcome_v~expo_v)
-# summary(o_v_e)
-
-# Perform MR
 library('MendelianRandomization')
-mr_in = mr_input(bx,bxse,by,byse)
-mr_plot(mr_in)
-res = list()
-res[["maxlik"]] = mr_maxlik(mr_in)
-res[["ivw"]] = mr_ivw(mr_in)
-# multivariate analysis
-res[["med"]] = mr_median(mr_in)
-res[["egger"]] = mr_egger(mr_in)
-res[["all"]] = mr_allmethods(mr_in)
-attr(res$egger,"Pvalue.Est")
-chisq.test(table(outcome_v,heart_disease_outcome[subjs]))$p.value
+run_mr_analysis<-function(expo_v,outcome_v,snps,covs=NULL,plot_mr_in=T,min_effect_size=0.1){
+  covs = covs[rownames(snps),]
+  lm_res = apply(snps,2,get_lm_stats_with_covs,y=expo_v,covs=covs)
+  bx = lm_res[1,]
+  bxse = lm_res[2,]
+  lm_res = apply(snps,2,get_lm_stats_with_covs,y=outcome_v,covs=covs)
+  by = lm_res[1,]
+  byse = lm_res[2,]
 
-# Same tests on the top associated snps
-num_top = 10
-ord = order(abs(bx),decreasing = T)
-mr_in = mr_input(bx[ord][1:num_top],bxse[ord][1:num_top],by[ord][1:num_top],byse[ord][1:num_top])
-mr_plot(mr_in)
-res = list()
-res[["maxlik"]] = mr_maxlik(mr_in)
-res[["ivw"]] = mr_ivw(mr_in)
-# multivariate analysis
-res[["med"]] = mr_median(mr_in)
-res[["egger"]] = mr_egger(mr_in)
-res[["all"]] = mr_allmethods(mr_in)
-attr(res$egger,"Pvalue.Est")
+  snps[is.na(snps)]=0
+  weighted_causal_v = snps %*% bx
+  lm_expo_vs_g = lm(expo_v~weighted_causal_v)
+  bx_obj = summary(lm_expo_vs_g)$coefficients
+  bx_u = bx_obj[-1,1]
+  bxse_u = bx_obj[-1,2]
+  lm_outcome_vs_g = lm(outcome_v~weighted_causal_v)
+  by_obj = summary(lm_outcome_vs_g)$coefficients
+  by_u = by_obj[-1,1]
+  byse_u = by_obj[-1,2]
+  
+  to_keep = bx>=min_effect_size
+  res = list()
+  if(sum(to_keep)>1){
+    mr_in = mr_input(bx[to_keep],bxse[to_keep],by[to_keep],byse[to_keep])
+    if(plot_mr_in){mr_plot(mr_in)}
+    res[["multivar_input"]] = mr_in
+    res[["multivar_egger"]] = mr_egger(mr_in)
+    res[["multivar_med"]] = mr_median(mr_in)
+    res[["multivar_all"]] = mr_allmethods(mr_in)
+  }
+  mr_in = mr_input(bx_u,bxse_u,by_u,byse_u)
+  res[["univar_input"]] = mr_in
+  res[["univar_ivw"]] = mr_ivw(mr_in)
+  res[["univar_ml"]] = mr_maxlik(mr_in)
+  return(res)
+}
 
 # Conditional independence tests
 #install.packages("bnlearn")
