@@ -6,11 +6,11 @@ args <- commandArgs(TRUE)
 pval.thresh <- 5e-8
 max.dist.between.snps <- 250000
 dir.to.search <- args[1]
-phenos <- list.files(path=dir.to.search,pattern=".22.continuous.assoc.linear")
+phenos <- list.files(path=dir.to.search,pattern="22.continuous.assoc.linear")
 toexclude <- list.files(path=dir.to.search,pattern="*adjusted")
 phenos=setdiff(phenos,toexclude)
 print(phenos) 
-phenos <- gsub(".22.continuous.assoc.linear","",phenos)
+phenos <- gsub("22.continuous.assoc.linear","",phenos)
 top.snp.files <- NULL
 top.snp.combined <- NULL
 
