@@ -1,0 +1,3 @@
+#!/bin/sh
+mkdir /oak/stanford/groups/euan/projects/ukbb/gwas/physical_activity_plink/qc/results_called/$1 
+$HOME/apps/plink/plink2 --bfile /oak/stanford/groups/euan/projects/ukbb/data/genetic_data/v2/plink_dir_genotype/ukb_cal_chr$2\_v2 --pheno overall_acceleration_average_not_normalized.continuous.txt   --input-missing-phenotype -1000   --covar covariates.emmi.txt --covar-name Sex YearOfBirth PC1 PC2 PC3 PC4 PC5 PC6 PC7 PC8 PC9 PC10 f.batch --out /oak/stanford/groups/euan/projects/ukbb/gwas/physical_activity_plink/qc/results_called/$1/$1.$2.continuous  --pheno-name $1 --keep euro_minus_exclusion_minus_firstdegree.txt --pheno-quantile-normalize --glm
