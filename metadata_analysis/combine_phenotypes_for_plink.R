@@ -117,7 +117,7 @@ scores_mat_simp = merge_scores_list_into_matrix(scores)
 colnames(scores_mat_simp) = paste(colnames(scores_mat_simp),"_simple",sep='')
 final_mat = cbind(scores_mat_simp,scores_mat_consv)
 print(dim(final_mat))
-corrs = get_pairwise_corrs(final_mat[,1:20])
+corrs = get_pairwise_corrs(final_mat)
 corrplot(corrs,order='hclust')
 save(final_mat,file="discrete_physical_activity_scores_for_GWAS.RData")
 
@@ -165,18 +165,6 @@ save(final_mat,file="additional_scores_for_GWAS.RData")
 ###############################################
 ###############################################
 
-library(corrplot)
-corrs = get_pairwise_corrs(final_mat)
-corrplot(corrs,order='hclust')
-
-# Merge matrices
-l = list()
-l[["additional"]] = get(load("additional_scores_for_GWAS.RData"))
-l[["fitness"]] = get(load("physical_fitness_scores_for_GWAS.RData"))
-all_pheno_mat = merge_scores_matriceslist_into_matrix(l)
-dim(all_pheno_mat)
-save(all_pheno_mat,file="all_pheno_mat_for_GWAS.RData")
-
 # Assumes that column names across all matrices are unique
 merge_scores_matriceslist_into_matrix<-function(l){
   rows = unique(unlist(sapply(l,rownames)))
@@ -190,6 +178,31 @@ merge_scores_matriceslist_into_matrix<-function(l){
   }
   return(m)
 }
+
+library(corrplot)
+corrs = get_pairwise_corrs(final_mat)
+corrplot(corrs,order='hclust')
+
+# Merge matrices
+l = list()
+l[["additional"]] = get(load("additional_scores_for_GWAS.RData"))
+l[["fitness"]] = get(load("physical_fitness_scores_for_GWAS.RData"))
+all_pheno_mat = merge_scores_matriceslist_into_matrix(l)
+dim(all_pheno_mat)
+all_corrs = get_pairwise_corrs(all_pheno_mat,method="spearman")
+all_sizes = get_pairwise_sizes(all_pheno_mat)
+colnames(all_corrs) = gsub(colnames(all_corrs),pattern="conservative",replace="consv")
+rownames(all_corrs) = gsub(rownames(all_corrs),pattern="conservative",replace="consv")
+
+corrplot(all_corrs,order='hclust',diag=T,tl.cex=0.9,
+         mar=rep(2.5,4),tl.col="black",tl.srt=65,cl.ratio=0.1,bg="gray")
+corrplot(all_corrs,order='hclust',type='upper',tl.pos="lt",diag=T,tl.cex=0.9,
+         mar=rep(2.5,4),tl.col="black",tl.srt=65,cl.ratio=0.1,bg="gray")
+col2 <-  colorRampPalette(c("green","darkgreen"))
+corrplot(log(all_sizes,base=10),add=T,type='lower',method='number',is.corr=F,
+         tl.pos="n",diag=F,number.cex=0.65,number.digits = 1,cl.ratio=0.1,
+         bg="black",col=col2(20),cl.length=5,cl.lim=c(4.8,5.8))
+save(all_pheno_mat,file="all_pheno_mat_for_GWAS.RData")
 
 # Sanity checks
 table(is.na(all_pheno_mat[,15]))

@@ -1,8 +1,9 @@
 try({setwd("/Users/davidhsu/Documents/ukbb")})
 try({setwd("/Users/david/Desktop/ukbb/")})
 try({setwd('/scratch/PI/euan/projects/ukbb/da_dh/')})
+try({setwd('/scratch/PI/euan/projects/ukbb/david/')})
 # We cannot change the working directory as we work in RStudio, so we comment out this line temporarily.
-source("auxiliary_functions.R")
+trsource("auxiliary_functions.R")
 
 # This script collates all pheno data files
 # This part both merges the different initial pheno data files that
@@ -63,7 +64,7 @@ wld_points_is_all_na_in_row = apply(is.na(wld_col_mat),1,all)
 # sanity check: whenever we have a workload score we should have a time point
 length(setdiff(which(!is.na(wld_col_mat)),which(!is.na(time_col_mat))))==0
 # Sanity check: the subject sets should be similar
-table(wld_points_is_all_na_in_row,time_points_is_all_na_in_row) #4/13/2017: the sets agree except for 196 subject with time points and no worlkloads
+table(wld_points_is_all_na_in_row,time_points_is_all_na_in_row) #4/13/2017: the sets agree except for 196 subjects with time points and no worlkloads
 rowSums(!is.na(time_col_mat[which(!time_points_is_all_na_in_row & wld_points_is_all_na_in_row)[1:10],]))
 subject_cleaned_pheno_data = pheno_data[!wld_points_is_all_na_in_row,]
 save(pheno_data,file="biobank_collated_pheno_data.RData")

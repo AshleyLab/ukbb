@@ -24,7 +24,7 @@ R2_Q_THRESHOLD = 0.5
 # This code gets an object called subject_cleaned_pheno_data: a matrix of subjects (rows)
 # vs the metadata features (columns)
 # Load the preprocessed pheno data
-load("biobank_collated_filtered_pheno_data.RData")
+load("rdata_archive/biobank_collated_filtered_pheno_data.RData")
 ###################################
 
 # Inspect the subject categories, are there discrepancies?
@@ -283,7 +283,8 @@ for (slice_name in names(preprocessed_data_slices)){
 }
 
 # Save the QC scores
-sapply(data_slice2_quality_scores,function(x)length(x$rho_exercise))
+sapply(data_slice2_quality_scores,function(x)mean(x$rho_exercise,na.rm=T))
+sapply(data_slice2_quality_scores,function(x)mean(x$rho_rest,na.rm=T))
 save(data_slice2_quality_scores,file="fitness_analysis_data_slice2_quality_scores.RData")
 
 ###############################################
@@ -435,8 +436,8 @@ for (slice_name in names(preprocessed_data_slices)){
       get_rest_phase_fitness_score(subj2rest_data[[nn]],rho_rest[nn],rest_time = rest_times[2],smooth_data=T,use_ratio=F)
     )
     ratio_scores = c(
-      get_rest_phase_fitness_score(subj2rest_data[[nn]],rho_rest[nn],rest_time = rest_times[1],smooth_data=T,use_ratio=F),
-      get_rest_phase_fitness_score(subj2rest_data[[nn]],rho_rest[nn],rest_time = rest_times[2],smooth_data=T,use_ratio=F)
+      get_rest_phase_fitness_score(subj2rest_data[[nn]],rho_rest[nn],rest_time = rest_times[1],smooth_data=T,use_ratio=T),
+      get_rest_phase_fitness_score(subj2rest_data[[nn]],rho_rest[nn],rest_time = rest_times[2],smooth_data=T,use_ratio=T)
     )
     HR_diffs = rbind(HR_diffs,diff_scores)
     HR_ratios = rbind(HR_ratios,ratio_scores)
@@ -465,6 +466,8 @@ for (slice_name in names(preprocessed_data_slices)){
   data_slice2fitness_score_objects[[slice_name]][["slopes"]] = slopes
 }
 
+plot(data_slice2fitness_score_objects[[1]]$HR_ratios[,2],data_slice2fitness_score_objects[[1]]$HR_diffs[,2])
+cor(data_slice2fitness_score_objects[[1]]$HR_ratios[,2],data_slice2fitness_score_objects[[1]]$HR_diffs[,2])
 save(data_slice2fitness_score_objects,file="fitness_analysis_data_slice2fitness_score_objects.RData")
 
 ###############################################
@@ -530,6 +533,8 @@ load("fitness_analysis_data_slice2fitness_score_objects.RData")
 par(mfrow=c(2,2))
 HR_ratios = lapply(data_slice2fitness_score_objects,function(x)x$HR_ratios[,2])
 HR_ratios_merged = merge_scores_set(HR_ratios,main = "Rest HR ratios after 60sec")
+HR_diffs = lapply(data_slice2fitness_score_objects,function(x)x$HR_diffs[,2])
+HR_diffs_merged = merge_scores_set(HR_diffs,main = "Rest HR ratios after 60sec")
 HR_ratios_classes = merge_scores_set(HR_ratios,main = "Rest HR ratios after 60sec",get_subj_classes = T)
 HR_pred_WDs = lapply(data_slice2fitness_score_objects,function(x)x$HR_pred_WD[,2])
 HR_pred_WDs_merged = merge_scores_set(HR_pred_WDs,main="Predicted HR at WD=100")
@@ -539,6 +544,12 @@ HR_WD_slopes_merged = merge_scores_set(HR_WD_slopes,main="Regression slopes")
 max_WDs = lapply(data_slice2fitness_score_objects,function(x)x$max_WDs)
 max_WDs_merged = merge_scores_set(max_WDs,main="Max achieved WD")
 max_WDs_classes = merge_scores_set(max_WDs,main="Max achieved WD",get_subj_classes = T)
+
+par(mfrow=c(2,2),mar=c(7.1, 4.1, 4.1, 2.1))
+boxplot(scores~classes,data=HR_ratios_merged,las=2,main="Recovery ratios")
+boxplot(scores~classes,data=HR_diffs_merged,las=2,main="Recovery differences")
+boxplot(scores~classes,data=max_WDs_merged,las=2,main="Max acheived HR")
+boxplot(log(scores,10)~classes,data=HR_pred_WDs_merged,las=2,main = "Exercise HR")
 
 # Check before merging into one matrix:
 all(rownames(HR_ratios_merged) == rownames(HR_pred_WDs_merged))
@@ -599,12 +610,12 @@ save(HR_ratios_merged,HR_pred_WDs_merged,
      fitness_scores_matrix,file="fitness_analysis_final_fitness_scores.RData")
 
 # Sanity check 1: compare the scores to the previous version 
-load('UKBB_phenotypic_data_for_GWAS.RData')
+load('rdata_archive/UKBB_phenotypic_data_for_GWAS.RData')
 x1 = fitness_scores_matrix[,"Predicted HR at WD=100"]
 x2 = fitness_scores[,"HR_pred_100"]
 inter = intersect(names(x1),names(x2))
 plot(x1[inter],x2[inter]);abline(0,1)
-get_pairwise_corrs(cbind(x1[inter],x2[inter]))
+get_pairwise_corrs(cbind(x1[inter],x2[inter]),method="spearman")
 
 ###############################################
 ###############################################

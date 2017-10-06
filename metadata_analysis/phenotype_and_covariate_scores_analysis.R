@@ -482,7 +482,7 @@ print_scores_vector_for_gwas(res4,paste("gwas/simpler_norm/",currname,".txt",sep
 par(mfrow=c(2,2))
 r2_scores = sapply(fitness_vs_covs_lm_objects,function(x)summary(x$lm)[["r.squared"]])
 r2_scores = format(r2_scores,digits=2)
-for (fitness_score_ind in 1:ncol(fitness_scores_matrix)){
+for (fitness_score_ind in 1:4){
   y = fitness_scores_matrix[,fitness_score_ind]
   currname = colnames(fitness_scores_matrix)[fitness_score_ind]
   lm1 = fitness_vs_covs_lm_objects[[currname]]
