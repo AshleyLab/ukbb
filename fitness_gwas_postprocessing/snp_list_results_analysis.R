@@ -1,4 +1,4 @@
-# Functional analysis of the sno results file
+# Functional analysis of the snp results file
 try({setwd("/Users/david/Desktop/ukbb/")})
 library(xlsx)
 
@@ -73,7 +73,35 @@ get_from_list<-function(l,nn,val=NULL){
 
 ###############################################
 ###############################################
-######### Load the data, print files ##########
+#### Aug 2017: Load the data, print files #####
+###############################################
+###############################################
+
+dirr = 'gwas/results_august_2017/'
+dirr = 'comp/results/simple_norm/'
+files = list.files(dirr)
+files = files[grepl('\\.txt$',files)]
+f_matrices = list()
+for (f in files){
+  f_matrices[[f]] = read.delim(paste(dirr,f,sep=''),sep=' ',header=F)
+  f_matrices[[f]] = f_matrices[[f]][!is.na(f_matrices[[f]][,1]),]
+  colnames(f_matrices[[f]]) = c("chr","snp","pos","p")
+}
+
+dir.create('gwas/results_august_2017/fuma_input')
+for (f in files){
+  fuma_in = print_dummy_FUMA_input(f_matrices[[f]],paste("gwas/results_august_2017/fuma_input/",f,sep=''))
+}
+
+###############################################
+###############################################
+#################### End ######################
+###############################################
+###############################################
+
+###############################################
+###############################################
+####July 2017: Load the data, print files #####
 ###############################################
 ###############################################
 

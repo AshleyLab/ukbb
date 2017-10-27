@@ -41,7 +41,7 @@ pairwise_plot<-function(x,y,func = joint.density.plot,sample_set = NULL,...){
 }
 # R^2 based analysis
 get_lm_r2<-function(x)unlist(unname(summary(x)["r.squared"]))
-get_pairwise_corrs<-function(x,...){
+get_pairwise_corrs_matrix<-function(x,...){
   n = ncol(x);cn = colnames(x)
   m = diag(1,n)
   rownames(m) = cn; colnames(m) = cn
@@ -54,6 +54,31 @@ get_pairwise_corrs<-function(x,...){
   }
   return(m)
 }
+get_pairwise_corrs_list<-function(x,...){
+  n = length(x);cn = names(x)
+  m = diag(1,n)
+  rownames(m) = cn; colnames(m) = cn
+  for(i in 2:n){
+    x1 = x[[i]]
+    x1 = x1[!is.na(x1)]
+    for(j in 1:(i-1)){
+      x2 = x[[j]]
+      x2 = x2[!is.na(x2)]
+      inds = intersect(names(x1),names(x2))
+      corr = cor(x1[inds],x2[inds],...)
+      m[i,j] = corr; m[j,i]=corr
+    }
+  }
+  return(m)
+}
+
+get_pairwise_corrs<-function(x,...){
+  if(is.null(dim(x))){
+    return(get_pairwise_corrs_list(x,...))
+  }
+  return(get_pairwise_corrs_matrix(x,...))
+}
+
 get_pairwise_sizes<-function(x,jaccard=F){
   n = ncol(x);cn = colnames(x);m = diag(0,n)
   rownames(m) = cn; colnames(m) = cn
