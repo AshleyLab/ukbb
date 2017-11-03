@@ -1,59 +1,76 @@
-# On Sherlock
-geno_path = '/oak/stanford/groups/euan/projects/ukbb/gwas/snp_extract/fitness'
-pheno_path = ''
-icd_path = '/oak/stanford/groups/euan/projects/ukbb/code/anna_code/icd/icd_matrix.txt'
+# The flow from the RHR paper:
+# 1. Rerun GWAS with p<1e-5, harsh LD threshold to increase power and independence
+# 2. Used a single-sample MR
 
-# Local
 # fitness
-geno_path = '/Users/David/Desktop/ukbb/mr/genotypes/fitness/' # OLD
-geno_path = '/Users/David/Desktop/ukbb/mr/genotypes/fitness/oct_16_2017/' # NEW: Oct 2017
+# geno_paths = c('/Users/David/Desktop/ukbb/gwas_interpretation/mr/genotypes/fitness/oct_16_2017/') # NEW: Oct 2017
+geno_paths = c('/Users/David/Desktop/ukbb/gwas_interpretation/mr/genotypes/fitness/oct_31_2017_exercise/',
+               '/Users/David/Desktop/ukbb/gwas_interpretation/mr/genotypes/fitness/oct_31_2017_recovery/')# NEW: Oct 2017
 pheno_path = '/Users/David/Desktop/ukbb/all_traits_for_gwas.RData'
 # activity
 #geno_path = '/Users/David/Desktop/ukbb/mr/genotypes/activity/'
 #pheno_path = '/Users/David/Desktop/ukbb/fitness_analysis_final_fitness_scores.RData'
 # other data
-icd_path = '/Users/David/Desktop/ukbb/mr/icd_matrix.txt'
+icd_path = '/Users/David/Desktop/ukbb/gwas_interpretation/mr/icd_matrix.txt'
 snps_fitness_table = '/Users/David/Desktop/ukbb/top.snps.xlsx'
 pcs_path = '/Users/David/Desktop/ukbb/covariates.augmented.txt'
 covariates_path = '/Users/David/Desktop/ukbb/covariate_matrix.RData'
 euro_ids_path = '/Users/David/Desktop/ukbb/pca_results_v2_chrom1_euro.eigenvec'
 
-# read the genotypes from the raw files
-geno_files = list.files(geno_path)
-geno_files = geno_files[grepl("\\.raw$",geno_files)]
-geno_data = NULL
-for(f in geno_files){
-  print(f)
-  snp_data = read.delim(paste(geno_path,f,sep=''),header=T,sep=" ")
-  rnames = snp_data[,1]
-  snp_data = snp_data[,-c(1:6)]
-  snp_names = colnames(snp_data)
-  inds = !grepl("_HET$",colnames(snp_data))
-  snp_data = snp_data[,inds]
-  snp_names = snp_names[inds]
-  if(length(snp_data)>0 && is.null(dim(snp_data))){
-    snp_data = t(t(snp_data))
-  }
-  rownames(snp_data) = rnames
-  colnames(snp_data) = snp_names
-  if(!is.null(geno_data) && any(rownames(geno_data)!=rownames(snp_data))){
-    print ("ERROR: row names do not match")
-    break
-  }
-  if(is.null(geno_data)){
-    geno_data = snp_data
-    next
-  }
-  geno_data = cbind(geno_data,snp_data)
-}
-colnames(geno_data) = gsub(colnames(geno_data),pattern = "_.$",replace="")
-dim(geno_data)
-save(geno_data,file=paste(geno_path,"geno_data_from_raw_files.RData",sep=''))
+# # Read the genotypes from the raw files
+# # ASSUMPTION: in each dir in geno_paths there are the same raw file names
+# # with the same subjects, but different SNPs
+# geno_path = geno_paths[1]
+# geno_files = list.files(geno_path)
+# geno_data = NULL
+# for (geno_path in geno_paths){
+#   curr_geno_files = list.files(geno_path)
+#   curr_geno_files = curr_geno_files[grepl("\\.raw$",curr_geno_files)] 
+#   curr_geno_data = NULL
+#   for(f in curr_geno_files){
+#     print(f)
+#     snp_data = read.delim(paste(geno_path,f,sep=''),header=T,sep=" ")
+#     rnames = snp_data[,1]
+#     snp_data = snp_data[,-c(1:6)]
+#     snp_names = colnames(snp_data)
+#     inds = !grepl("_HET$",colnames(snp_data))
+#     snp_data = snp_data[,inds]
+#     snp_names = snp_names[inds]
+#     if(length(snp_data)>0 && is.null(dim(snp_data))){snp_data = t(t(snp_data))}
+#     rownames(snp_data) = rnames
+#     colnames(snp_data) = snp_names
+#     if(!is.null(curr_geno_data) && length(setdiff(rownames(curr_geno_data),rownames(snp_data)))>0){
+#       print (paste("ERROR: row names do not match in: ", f))
+#       next
+#     }
+#     if(is.null(curr_geno_data)){
+#       curr_geno_data = snp_data
+#       next
+#     }
+#     curr_geno_data = cbind(curr_geno_data,snp_data)
+#   }
+#   colnames(curr_geno_data) = gsub(colnames(curr_geno_data),pattern = "_.$",replace="")
+#   print(dim(curr_geno_data))
+#   if(!is.null(geno_data) && any(rownames(curr_geno_data)!=rownames(geno_data))){
+#     print ("ERROR: row names do not match")
+#     break
+#   }
+#   if(is.null(geno_data)){
+#     geno_data = curr_geno_data
+#   }
+#   else{
+#     geno_data = cbind(geno_data,curr_geno_data[,setdiff(colnames(curr_geno_data),colnames(geno_data))])
+#   }
+# }
+# save(geno_data,file=paste(geno_path,"geno_data_from_raw_files.RData",sep=''))
 
 # Save some time by loading directly:
+geno_path = geno_paths[length(geno_paths)]
 load(paste(geno_path,"geno_data_from_raw_files.RData",sep=''))
 geno_data = as.matrix(geno_data)
 mafs = apply(geno_data>0,2,function(x){x=x[!is.na(x)];mean(as.numeric(x>0))})
+mafs = pmin(mafs,1-mafs)
+hist(mafs,breaks=50)
 
 gaus_norm<-function(x){
   x_r = (rank(x)-0.5)/length(x)
@@ -77,7 +94,21 @@ if(IS_ACTIVITY){
 }
 if(!IS_ACTIVITY){
   expo = fitness_scores_matrix
+  # Use the original results
+  # fuma_path = "/Users/David/Desktop/ukbb/gwas_interpretation/fuma/filtered_maf_0.01_1000genomes/pooled_p1_5e8_p2_1e4_ld_0.6_with_maf/"
+  # exercise_snps = read.delim(paste(fuma_path,"leadSNPs.txt",sep=''),stringsAsFactors = F)$rsID
+  # Use the new ones
+  fuma_path1 = "/Users/David/Desktop/ukbb/gwas_interpretation/fuma/filtered_maf_0.01/pooled_exercise_hr_p1_5e6_ld_0.1_for_MR/"
+  fuma_path2 = "/Users/David/Desktop/ukbb/gwas_interpretation/fuma/filtered_maf_0.01/pooled_recovery_p1_5e6_ld_0.1_for_MR/"
+  snp_lists = list()
+  snp_lists[["ExerciseHR"]] = read.delim(paste(fuma_path1,"leadSNPs.txt",sep=''),stringsAsFactors = F)$rsID
+  snp_lists[["Recovery"]] = read.delim(paste(fuma_path2,"leadSNPs.txt",sep=''),stringsAsFactors = F)$rsID
+  all_snps = unique(unlist(snp_lists))
+  geno_data = geno_data[,intersect(all_snps,colnames(geno_data))]
 }
+# setdiff(unique(unlist(snp_lists)),colnames(geno_data))
+# intersect(unique(unlist(snp_lists)),colnames(geno_data))
+# setdiff(colnames(geno_data),unique(unlist(snp_lists)))
 
 # read the clinical outcomes and partition the code into classes by:
 # A00-B99  Certain infectious and parasitic diseases
@@ -125,7 +156,7 @@ if(!IS_ACTIVITY){
 # V, W, X, Y:  External Causes of Morbidity (homecare will only have to code how patient was hurt; other settings will also code where injury occurred, what activity patient was doing)
 # Z:  Factors Influencing Health Status and Contact with Health Services (similar to current "V-codes")
 icd_data = read.delim(icd_path)
-rownames(icd_data) = icd_data[,1]
+rownames(icd_data) = as.character(icd_data[,1])
 icd_data = icd_data[,-1]
 icd_data_code_classes = list()
 icd_data_code_classes[["heart_disease"]] = c(
@@ -172,19 +203,26 @@ colnames(covariate_matrix)[ncol(covariate_matrix)] = "batch"
 pc_names = colnames(pcs_matrix)
 simple_covs = covariate_matrix[,c("Sex","Age when attended assessment centre",pc_names,"batch")]
 simple_covs[,"Sex"] = as.numeric(as.factor(simple_covs[,"Sex"]))-1
-rm(external_covs);rm(pcs_matrix);rm(covariate_matrix);gc()
+rm(external_covs);rm(pcs_matrix);gc()
 
 # Define the subject sets and the data for the two-sample analysis
 expo_subjs = rownames(expo)
 if(is.null(expo_subjs)){expo_subjs = names(expo)}
 outcome_subjs = setdiff(rownames(geno_data),expo_subjs)
-
+one_sample_outcome_subjs = intersect(rownames(geno_data),expo_subjs)
 subjects_with_data = intersect(rownames(simple_covs),euro_ids) # European that have covariates
 subjects_with_data = intersect(subjects_with_data,rownames(geno_data)) # Have genotypes
 expo_subjs = intersect(expo_subjs,subjects_with_data)
 outcome_subjs = intersect(outcome_subjs,subjects_with_data)
 outcome_subjs = intersect(outcome_subjs,rownames(icd_data))
+one_sample_outcome_subjs = intersect(one_sample_outcome_subjs,subjects_with_data)
+one_sample_outcome_subjs = intersect(one_sample_outcome_subjs,rownames(icd_data))
 gc()
+# Look at age and sex distribution
+expo_subjs_age = simple_covs[expo_subjs,2]
+nonexpo_subjs_age = simple_covs[setdiff(rownames(simple_covs),expo_subjs),2]
+quantile(expo_subjs_age)
+quantile(nonexpo_subjs_age)
 
 # Define the tested outcomes
 get_outcome_v<-function(x,y){
@@ -199,34 +237,58 @@ transform_outcome_to_binary<-function(x){
   return(x)
 }
 outcome_vs = lapply(icd_outcome_matrices,get_outcome_v,y=outcome_subjs)
+par(mfrow=c(2,3));sapply(outcome_vs,hist);names(outcome_vs)
 outcome_vs[["rhr"]] = gaus_norm(additional_scores$`Pulse rate`)
 outcome_vs[["rhr"]] = outcome_vs[["rhr"]][intersect(names(outcome_vs[["rhr"]]),outcome_subjs)]
 outcome_vs[1:4] = lapply(outcome_vs[1:4],transform_outcome_to_binary)
 sapply(outcome_vs,length)
+one_sample_outcome_vs = lapply(icd_outcome_matrices,get_outcome_v,y=one_sample_outcome_subjs)
+par(mfrow=c(2,3));sapply(one_sample_outcome_vs,hist);names(one_sample_outcome_vs)
+one_sample_outcome_vs[["rhr"]] = gaus_norm(additional_scores$`Pulse rate`)
+one_sample_outcome_vs[["rhr"]] = one_sample_outcome_vs[["rhr"]][intersect(names(one_sample_outcome_vs[["rhr"]]),one_sample_outcome_subjs)]
+one_sample_outcome_vs[1:4] = lapply(one_sample_outcome_vs[1:4],transform_outcome_to_binary)
+sapply(one_sample_outcome_vs,length)
+sapply(one_sample_outcome_vs[1:4],function(x)sum(x)/length(x))
+sapply(outcome_vs[1:4],function(x)sum(x)/length(x))
 
-# Oct 2017
-# Before MR, check if any of our SNPs is associated with selected traits
-# such as hemoglobin
-load(covariates_path)
-y1 = covariate_matrix[expo_subjs,"Haemoglobin concentration"]
-names(y1) = expo_subjs
-x1 = simple_covs[expo_subjs,]
-d = data.frame(y1,x1)
-d$batch = factor(d$batch)
-x1_lm = lm(y1~.,data=d)
-summary(x1_lm)
-hemo_resids = x1_lm$residuals
-plot(hemo_resids,y1[names(hemo_resids)])
-pvals = c()
-for(j in 1:ncol(geno_data)){
-  x2 = geno_data[names(hemo_resids),j]
-  curr_lm = lm(hemo_resids~x2)
-  curr_sum = summary(curr_lm)
-  p = curr_sum$coefficients[2,4]
-  pvals[j] = p
-}
-names(pvals) = colnames(geno_data)
-pvals[pvals<1e-4]
+# # Oct 2017
+# # Before MR, check if any of our SNPs is associated with selected traits
+# # such as hemoglobin
+# load(covariates_path)
+# y1 = covariate_matrix[expo_subjs,"Haemoglobin concentration"]
+# names(y1) = expo_subjs
+# x1 = simple_covs[expo_subjs,]
+# d = data.frame(y1,x1)
+# d$batch = factor(d$batch)
+# x1_lm = lm(y1~.,data=d)
+# summary(x1_lm)
+# hemo_resids = x1_lm$residuals
+# plot(hemo_resids,y1[names(hemo_resids)])
+# pvals = c()
+# for(j in 1:ncol(geno_data)){
+#   x2 = geno_data[names(hemo_resids),j]
+#   curr_lm = lm(hemo_resids~x2)
+#   curr_sum = summary(curr_lm)
+#   p = curr_sum$coefficients[2,4]
+#   pvals[j] = p
+# }
+# names(pvals) = colnames(geno_data)
+# pvals[pvals<1e-4]
+# mafs["rs16891982"]
+
+# # Simple analyses of our scores vs the disease states
+# icd_data_euro = icd_data[intersect(rownames(icd_data),subjects_with_data),]
+# chisq_tests = list()
+# for (nn in unique(unlist(icd_data_code_columns))){
+#   ks_tests[[nn]] = list()
+#   for(ss in colnames(geno_data)){
+#     x1 = icd_data_euro[,nn]
+#     x2 = geno_data[rownames(icd_data_euro),ss]
+#     chisq_tests[[nn]][[ss]] = chisq.test(table(x1,x2))
+#   }
+# }
+# chisq_pvals = lapply(chisq_tests,function(x)sapply(x,function(y)y$p.value))
+# sapply(chisq_pvals,function(x)sum(x<0.01))
 
 # Read the snp lists
 if(!IS_ACTIVITY){
@@ -254,13 +316,6 @@ if(!IS_ACTIVITY){
   # fitness_snps = unique(as.character(read.xlsx2(snps_fitness_table,sheetIndex = 1)$snp))
   # print(length(intersect(fitness_snps,colnames(geno_data))))
   
-  fuma_path = "/Users/David/Desktop/ukbb/gwas_interpretation/fuma/pooled_p1_5e8_p2_1e4_ld_0.6_with_maf/"
-  exercise_snps = read.delim(paste(fuma_path,"leadSNPs.txt",sep=''),stringsAsFactors = F)$rsID
-  
-  snp_lists = list()
-  snp_lists[["ExerciseHR"]] = intersect(colnames(geno_data),exercise_snps)
-  snp_lists[["Recovery"]] = setdiff(colnames(geno_data),exercise_snps)
-
   # Fitness analysis: format all data to be on the same subjects
   expo_vs = list()
   expo_vs[["ExerciseHR"]] = expo[expo_subjs,2]
@@ -271,83 +326,198 @@ if(!IS_ACTIVITY){
   mr_analysis_res = list()
   for(nn2 in names(expo_vs)){
     for(nn3 in names(outcome_vs)){
-      currname = paste(nn2,nn3,sep=",")
+      currname = paste(nn2,nn3,"twosample",sep=",")
       if(is.element(currname,set=names(mr_analysis_res))){next}
       print(currname)
       expo_v = expo_vs[[nn2]]
       outcome_v = outcome_vs[[nn3]]
-      currsnps = snp_lists[[nn2]]
+      currsnps = intersect(snp_lists[[nn2]],colnames(geno_data))
       mr_analysis_res[[currname]] = 
           run_mr_analysis(expo_v,outcome_v,geno_data[,currsnps],covs=simple_covs,min_effect_size = 0)
+      print(mr_analysis_res[[currname]]$multivar_egger)
+      
+      currname = paste(nn2,nn3,"onesample",sep=",")
+      if(is.element(currname,set=names(mr_analysis_res))){next}
+      print(currname)
+      expo_v = expo_vs[[nn2]]
+      outcome_v = one_sample_outcome_vs[[nn3]]
+      inds = intersect(names(expo_v),names(outcome_v))
+      print(chisq.test(table(cut(expo_v[inds],5),outcome_v[inds]))$p.value)
+      currsnps = intersect(snp_lists[[nn2]],colnames(geno_data))
+      mr_analysis_res[[currname]] = 
+        run_mr_analysis(expo_v,outcome_v,geno_data[,currsnps],covs=simple_covs,min_effect_size = 0)
       print(mr_analysis_res[[currname]]$multivar_egger)
     }
   }
 }
-p.adjust(sapply(mr_analysis_res,function(x)attr(x[["univar_ivw"]],"Pval")),method='fdr')
-p.adjust(sapply(mr_analysis_res,function(x)attr(x[["multivar_egger"]],"Pvalue.Est")),method='fdr')
+save(mr_analysis_res,file="/Users/David/Desktop/ukbb/gwas_interpretation/mr/results_nov_1_2017.RData")
+# Create a slim version of the results - remove the lm objects
+sapply(mr_analysis_res[[1]],class)
+for (i in 1:length(mr_analysis_res)){
+  mr_analysis_res[[i]]$unival_outcome_lm = NULL
+  mr_analysis_res[[i]]$univar_expo_lm = NULL
+}
+gc()
+save(mr_analysis_res,file="/Users/David/Desktop/ukbb/gwas_interpretation/mr/results_nov_1_2017_slim.RData")
+
+load("/Users/David/Desktop/ukbb/gwas_interpretation/mr/results_nov_1_2017_slim.RData")
+
+# Get a summary table
+univar_ps = sapply(mr_analysis_res,function(x)attr(x[["univar_ivw"]],"Pval"))
+univar_est = sapply(mr_analysis_res,function(x)attr(x[["univar_ivw"]],"Estimate"))
+median_ps = sapply(mr_analysis_res,function(x)attr(x[["multivar_med"]],"Pvalue"))
+median_est = sapply(mr_analysis_res,function(x)attr(x[["multivar_med"]],"Estimate"))
+egger_ps = sapply(mr_analysis_res,function(x)attr(x[["multivar_egger"]],"Causal.pval"))
+egger_est = sapply(mr_analysis_res,function(x)attr(x[["multivar_egger"]],"Estimate"))
+mat = c()
+GWS = paste(format(univar_est,digits = 2),paste('(',format(univar_ps,digits=3),')',sep=''),sep=' ')
+Median = paste(format(median_est,digits = 2),paste('(',format(median_ps,digits=3),')',sep=''),sep=' ')
+Egger = paste(format(egger_est,digits = 2),paste('(',format(egger_ps,digits=3),')',sep=''),sep=' ')
+mat = cbind(GWS,Median,Egger)
+rownames(mat) = names(univar_ps)
+
+# Inspect a specific genetic weighted score: heart disease has inverted results
+names(mr_analysis_res)
+nn = names(mr_analysis_res)[1]
+bx = mr_analysis_res[[nn]]$multivar_input@betaX
+mm = as.matrix(geno_data[,names(bx)])
+mm[is.na(mm)] = 0
+gws = mm %*% bx
+rhr = additional_scores$`Pulse rate`
+names(gws) = rownames(geno_data)
+out_name = strsplit(nn,split=',')[[1]][2]
+inds = intersect(names(gws),names(outcome_vs[[out_name]]))
+out_v = outcome_vs[[out_name]][inds];xx = gws[inds]
+boxplot(xx~out_v)
+summary(lm(xx~out_v))
+expo_name = strsplit(nn,split=',')[[1]][1]
+expo_v = expo_vs[[expo_name]]
+out_v2 = one_sample_outcome_vs[[out_name]]
+inds2 = intersect(names(out_v2),names(expo_v))
+inds2 = names(expo_v)[!is.na(expo_v)]
+G = gws[inds2];X=expo_v[inds2];Y=out_v2[inds2]
+summary(lm(Y~G))
+summary(lm(X~G))
+boxplot(G~Y)
+boxplot(X~Y)
+boxplot(rhr[names(Y)]~Y)
+load("/Users/david/Desktop/ukbb/subject2exercise_category.RData")
+Z = subj2category[inds2]
+M = icd_outcome_matrices[[out_name]][inds2,]
+G2 = gws[setdiff(inds,inds2)];Y2=out_v[setdiff(inds,inds2)]
+boxplot(rhr[names(Z)]~Z)
+table(Z)
+# Look at other covariates
+U = covariate_matrix
+YY = c(Y,Y2)
+par(mfrow=c(3,3))
+for(j in 1:ncol(U)){
+  u = U[,j];names(u)=rownames(U)
+  currname = colnames(U)[j]
+  is_num = is.element("numeric",set=class(U[[j]])) || is.element("integer",set=class(U[[j]]))
+  u = u[names(YY)]
+  if(is_num){
+    u1 = u[YY==1];u0 = u[YY==0]
+    ks.test(u1,u0)$p.value
+    boxplot(u~YY,main=currname)
+  }
+  else{
+    tt = table(u,YY)
+    tt = table(u,YY)/rowSums(tt)
+  }
+  Sys.sleep(2)
+}
+
+# Show disease vs. RHR in different age and sex strata
+AGE = simple_covs[,2];names(AGE) = rownames(simple_covs)
+AGE2 = gaus_norm(AGE)^2
+U2 = simple_covs[names(YY),1:2]
+U2[,2] = cut(U2[,2],5)
+ZZ = paste("Sex:",U2[,1],", Age:",U2[,2],sep='')
+table(ZZ)
+AC1 = covariate_matrix[,"Number of days/week of moderate physical activity 10+ minutes"]
+AC2 = covariate_matrix[,"Number of days/week of vigorous physical activity 10+ minutes"]
+names(AC1) = rownames(covariate_matrix);names(AC2) = rownames(covariate_matrix)
+par(mfrow=c(2,5))
+for(strat in sort(unique(ZZ))){
+  inds = names(YY)[ZZ==strat]
+  curr_rhr = rhr[inds]
+  curr_y = YY[inds]
+  curr_tt = table(curr_y)
+  curr_names = paste(paste(names(curr_tt),",N=",curr_tt,sep=''))
+  wilcox.test(AGE[inds][curr_y==1],AGE[inds][curr_y==0])$p.value
+  boxplot(curr_rhr~curr_y,main=strat,ylim=c(30,140),
+        names=curr_names,ylab="RHR")
+}
+for(strat in sort(unique(ZZ))){
+  inds = names(YY)[ZZ==strat]
+  curr_rhr = AC2[inds]
+  inds = names(curr_rhr)[curr_rhr>=0]
+  curr_rhr = curr_rhr[inds]
+  curr_y = YY[inds]
+  curr_tt = table(curr_y)
+  curr_names = paste(paste(names(curr_tt),",N=",curr_tt,sep=''))
+  boxplot(curr_rhr~curr_y,main=strat,names=curr_names,ylab="Activity")
+}
+inds = intersect(names(YY),names(rhr))
+d = data.frame(rhr=rhr[inds],Sex=simple_covs[inds,1],
+               Age=simple_covs[inds,2],Age2 = AGE2[inds],HeartDisease=YY[inds])
+boxplot(rhr~Sex,data=d)
+boxplot(rhr~HeartDisease,data=d)
+summary(lm(rhr~.,data=d))
+
+# Redo MR, age<50
+age_thr=55
+age_selected_subjects = rownames(simple_covs)[simple_covs[,2]<age_thr]
+age_gws = gws[age_selected_subjects]
+lm1_names = intersect(names(Y2),age_selected_subjects)
+lm1 = lm(Y2[lm1_names]~age_gws[lm1_names]+U2[lm1_names,1]+U2[lm1_names,2])
+lm2_names = intersect(names(Y),age_selected_subjects)
+lm2 = lm(X[lm2_names]~age_gws[lm2_names])
 
 # Compare the disease outcomes
 x1 = outcome_vs$hypertension
 x2 = outcome_vs$disease_merge
 table(x1,x2>0)
 
-mr_plot(mr_analysis_res$`ExerciseHR,heart_disease`$multivar_input)
-mr_plot(mr_analysis_res$`ExerciseHR,hypertension`$multivar_input)
-mr_plot(mr_analysis_res$`ExerciseHR,rhr`$multivar_input)
-save(mr_analysis_res,file="/Users/David/Desktop/ukbb/mr/results_oct_2017.RData")
+mr_plot(mr_analysis_res$`ExerciseHR,heart_disease,onesample`$multivar_input)
+mr_plot(mr_analysis_res$`ExerciseHR,hypertension,onesample`$multivar_input)
+mr_plot(mr_analysis_res$`ExerciseHR,rhr,onesample`$multivar_input)
+mr_plot(mr_analysis_res$`ExerciseHR,rhr,twosample`$multivar_input)
 
-# Sanity check: compare recovery-rhr analysis to the two-sample indirect analysis
-# recovery analysis
-input_file = '/Users/David/Desktop/ukbb/mr/gwas_effects/recovery_snps_all_effects.txt'
-effects_data = read.delim(input_file)
-mr_data = get_twosample_mr_input(effects_data) # this is from the twosample_mr_analysis.R script
-mr_in_recovery_direct = mr_analysis_res$`Recovery,rhr`$multivar_input
-# exercise hr
-input_file = '/Users/David/Desktop/ukbb/mr/gwas_effects/exercise_snps_all_effects.txt'
-effects_data = read.delim(input_file)
-mr_data = get_twosample_mr_input(effects_data) # this is from the twosample_mr_analysis.R script
-mr_in_recovery_direct = mr_analysis_res$`ExerciseHR,rhr`$multivar_input
-direct_bx = mr_in_recovery_direct@betaX
-indirect_bx = mr_data[names(direct_bx),"bx"]
-plot(direct_bx,indirect_bx);abline(0,1)
-direct_bxse = mr_in_recovery_direct@betaXse
-indirect_bxse = mr_data[names(direct_bx),"bxse"]
-plot(direct_bxse,indirect_bxse);abline(0,1)
-direct_by = mr_in_recovery_direct@betaY
-indirect_by = mr_data[names(direct_bx),"by"]
-plot(direct_by,indirect_by);abline(0,1)
-direct_byse = mr_in_recovery_direct@betaYse
-indirect_byse = mr_data[names(direct_bx),"byse"]
-plot(direct_byse,indirect_byse);abline(0,1)
-direct_bx[mafs[names(direct_bx)]>0.5] = -direct_bx[mafs[names(direct_bx)]>0.5]
-direct_by[mafs[names(direct_by)]>0.5] = -direct_by[mafs[names(direct_by)]>0.5]
-plot(direct_bx,direct_by);abline(0,1)
-plot(indirect_bx,indirect_by);abline(0,1)
-# in case of disagreement:
-problematic_snps = names(which(direct_bx*indirect_bx < 0))
-direct_bx[problematic_snps]
-mafs[problematic_snps]
-colSums(geno_data[,problematic_snps]>0)
-snps = geno_data[,problematic_snps]
-
-names(mr_analysis_res)
-name1 = "ExerciseHR,heart_disease"
-mr_in = mr_analysis_res[[name1]][["multivar_input"]]
-mr_plot(mr_in)
-mr_analysis_res[[name1]][["multivar_egger"]]
-mr_analysis_res[[name1]][["multivar_all"]]
-expo_v = expo_vs[["ExerciseHR"]]
-outcome_v = outcome_vs[["heart_disease"]]
-subjs = intersect(names(expo_v),rownames(geno_data))
-subjs = intersect(names(outcome_v),subjs)
-expo_v = expo_v[subjs]
-outcome_v = outcome_v[subjs]
-
-d = data.frame(x=weighted_causal_v,y=outcome_v,z=expo_v)
-run_discrete_ci_test(d,5)$p.value
-
-d = data.frame(x=weighted_causal_v,y=expo_v,z=outcome_v)
-run_discrete_ci_test(d,5)$p.value
+# # Sanity check: compare recovery-rhr analysis to the two-sample indirect analysis
+# # recovery analysis
+# input_file = '/Users/David/Desktop/ukbb/mr/gwas_effects/recovery_snps_all_effects.txt'
+# effects_data = read.delim(input_file)
+# mr_data = get_twosample_mr_input(effects_data) # this is from the twosample_mr_analysis.R script
+# mr_in_recovery_direct = mr_analysis_res$`Recovery,rhr`$multivar_input
+# # exercise hr
+# input_file = '/Users/David/Desktop/ukbb/mr/gwas_effects/exercise_snps_all_effects.txt'
+# effects_data = read.delim(input_file)
+# mr_data = get_twosample_mr_input(effects_data) # this is from the twosample_mr_analysis.R script
+# mr_in_recovery_direct = mr_analysis_res$`ExerciseHR,rhr`$multivar_input
+# direct_bx = mr_in_recovery_direct@betaX
+# indirect_bx = mr_data[names(direct_bx),"bx"]
+# plot(direct_bx,indirect_bx);abline(0,1)
+# direct_bxse = mr_in_recovery_direct@betaXse
+# indirect_bxse = mr_data[names(direct_bx),"bxse"]
+# plot(direct_bxse,indirect_bxse);abline(0,1)
+# direct_by = mr_in_recovery_direct@betaY
+# indirect_by = mr_data[names(direct_bx),"by"]
+# plot(direct_by,indirect_by);abline(0,1)
+# direct_byse = mr_in_recovery_direct@betaYse
+# indirect_byse = mr_data[names(direct_bx),"byse"]
+# plot(direct_byse,indirect_byse);abline(0,1)
+# direct_bx[mafs[names(direct_bx)]>0.5] = -direct_bx[mafs[names(direct_bx)]>0.5]
+# direct_by[mafs[names(direct_by)]>0.5] = -direct_by[mafs[names(direct_by)]>0.5]
+# plot(direct_bx,direct_by);abline(0,1)
+# plot(indirect_bx,indirect_by);abline(0,1)
+# # in case of disagreement:
+# problematic_snps = names(which(direct_bx*indirect_bx < 0))
+# direct_bx[problematic_snps]
+# mafs[problematic_snps]
+# colSums(geno_data[,problematic_snps]>0)
+# snps = geno_data[,problematic_snps]
 
 # if(IS_ACTIVITY){
 #   # Activity analysis: format all data to be on the same subjects
@@ -394,7 +564,8 @@ get_lm_stats_with_covs<-function(x,y,covs){
   o = summary(lm(y~.,data=d))$coefficients
   b = o["x",1]
   s = o["x",2]
-  return(c(b,s))
+  p = o["x",4]
+  return(c(b,s,p))
 }
 gaus_norm<-function(x){
   x_r = (rank(x)-0.5)/length(x)
@@ -418,8 +589,8 @@ run_mr_analysis<-function(expo_v,outcome_v,snps,covs=NULL,plot_mr_in=T,min_effec
   by = lm_res[1,]
   byse = lm_res[2,]
   print("Two sample estimate completed")
-  plot(bx,by)
-
+  
+  to_keep = abs(bx)>=0
   to_keep = abs(bx)>=min_effect_size
   if(sum(to_keep)==0){to_keep = abs(bx)>=median(abs(bx))}
   outcome_snps[is.na(outcome_snps)]=0
@@ -443,7 +614,7 @@ run_mr_analysis<-function(expo_v,outcome_v,snps,covs=NULL,plot_mr_in=T,min_effec
     mr_in = mr_input(bx[to_keep],bxse[to_keep],by[to_keep],byse[to_keep])
     if(plot_mr_in){mr_plot(mr_in)}
     res[["multivar_input"]] = mr_in
-    res[["multivar_egger"]] = mr_egger(mr_in,T,T)
+    res[["multivar_egger"]] = mr_egger(mr_in,F,T)
     res[["multivar_med"]] = mr_median(mr_in)
     res[["multivar_all"]] = mr_allmethods(mr_in)
   }

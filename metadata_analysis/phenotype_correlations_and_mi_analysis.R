@@ -35,6 +35,7 @@ subj2category = category_matrix[,1]
 names(subj2category) = rownames(category_matrix) 
 subj2category[is.na(subj2category)] = category_matrix[is.na(subj2category),2]  
 table(subj2category)
+save(subj2category,file="subject2exercise_category.RData")
 
 # Plot the scores vs. the categories: Recovery
 y = fitness_scores_matrix[,1]
