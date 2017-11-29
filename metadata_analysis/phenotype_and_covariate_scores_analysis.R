@@ -40,6 +40,9 @@ hae_data = pheno_data[,names(hae_features)]
 hae_data_is_na = is.na(hae_data)
 sort(colSums(hae_data_is_na)/nrow(hae_data))[1:10]
 hist(pheno_data[,"Haemoglobin concentration.0.0"])
+# Nov 2017: check cholesterol
+chol_features = feature_code2name[grepl(feature_code2name,pattern="chol",ignore.case=T)]
+
 
 # Load mapping of pheno data column names into categories
 feature_metadata =  read.csv('Data_Dictionary_Showcase.csv')
@@ -183,7 +186,7 @@ subcategories_to_exclude = c(
 # Filter 1
 features_to_exclude = unique(unlist(sapply(additional_scores,colnames)))
 # Filter 2
-# Remove columns using the above recommentations and the defined categories to remove
+# Remove columns using the above recommendations and the defined categories to remove
 for(j in 1:ncol(pheno_data)){
   currf = colnames(pheno_data)[j]
   currf_name = feature_code2name[currf]

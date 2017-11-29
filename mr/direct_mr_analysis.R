@@ -105,6 +105,7 @@ if(!IS_ACTIVITY){
   snp_lists[["Recovery"]] = read.delim(paste(fuma_path2,"leadSNPs.txt",sep=''),stringsAsFactors = F)$rsID
   all_snps = unique(unlist(snp_lists))
   geno_data = geno_data[,intersect(all_snps,colnames(geno_data))]
+  rm(accelerometry_scores)
 }
 # setdiff(unique(unlist(snp_lists)),colnames(geno_data))
 # intersect(unique(unlist(snp_lists)),colnames(geno_data))
@@ -183,6 +184,8 @@ icd_data_code_columns = icd_data_code_columns[sapply(icd_data_code_columns,lengt
 icd_outcome_matrices = lapply(icd_data_code_columns,function(x,y)y[,x],y=icd_data)
 sapply(icd_outcome_matrices,dim)
 
+healthy_subjs = rownames(icd_data)[rowSums(icd_data)==0]
+
 # Read the covariates for the analysis
 external_covs = read.delim(pcs_path)
 table(external_covs$PC1!=(-1000))
@@ -250,6 +253,16 @@ one_sample_outcome_vs[1:4] = lapply(one_sample_outcome_vs[1:4],transform_outcome
 sapply(one_sample_outcome_vs,length)
 sapply(one_sample_outcome_vs[1:4],function(x)sum(x)/length(x))
 sapply(outcome_vs[1:4],function(x)sum(x)/length(x))
+
+check_maf_issue<-function(x){
+  if((sum(x,na.rm=T)/2*sum(!is.na(x)))>0.5){
+    print("fixing")
+    return(2-x)
+  }
+  return(x)
+}
+corrected_maf_geno_data = apply(geno_data,2,check_maf_issue)
+table(geno_data[,1],corrected_maf_geno_data[,1])
 
 # # Oct 2017
 # # Before MR, check if any of our SNPs is associated with selected traits
@@ -323,42 +336,42 @@ if(!IS_ACTIVITY){
   expo_vs = lapply(expo_vs,function(x)x[!is.na(x)])
   expo_vs = lapply(expo_vs,gaus_norm)
   
-  mr_analysis_res = list()
-  for(nn2 in names(expo_vs)){
-    for(nn3 in names(outcome_vs)){
-      currname = paste(nn2,nn3,"twosample",sep=",")
-      if(is.element(currname,set=names(mr_analysis_res))){next}
-      print(currname)
-      expo_v = expo_vs[[nn2]]
-      outcome_v = outcome_vs[[nn3]]
-      currsnps = intersect(snp_lists[[nn2]],colnames(geno_data))
-      mr_analysis_res[[currname]] = 
-          run_mr_analysis(expo_v,outcome_v,geno_data[,currsnps],covs=simple_covs,min_effect_size = 0)
-      print(mr_analysis_res[[currname]]$multivar_egger)
-      
-      currname = paste(nn2,nn3,"onesample",sep=",")
-      if(is.element(currname,set=names(mr_analysis_res))){next}
-      print(currname)
-      expo_v = expo_vs[[nn2]]
-      outcome_v = one_sample_outcome_vs[[nn3]]
-      inds = intersect(names(expo_v),names(outcome_v))
-      print(chisq.test(table(cut(expo_v[inds],5),outcome_v[inds]))$p.value)
-      currsnps = intersect(snp_lists[[nn2]],colnames(geno_data))
-      mr_analysis_res[[currname]] = 
-        run_mr_analysis(expo_v,outcome_v,geno_data[,currsnps],covs=simple_covs,min_effect_size = 0)
-      print(mr_analysis_res[[currname]]$multivar_egger)
-    }
-  }
+#   mr_analysis_res = list()
+#   for(nn2 in names(expo_vs)){
+#     for(nn3 in names(outcome_vs)){
+#       currname = paste(nn2,nn3,"twosample",sep=",")
+#       if(is.element(currname,set=names(mr_analysis_res))){next}
+#       print(currname)
+#       expo_v = expo_vs[[nn2]]
+#       outcome_v = outcome_vs[[nn3]]
+#       currsnps = intersect(snp_lists[[nn2]],colnames(geno_data))
+#       mr_analysis_res[[currname]] = 
+#           run_mr_analysis(expo_v,outcome_v,geno_data[,currsnps],covs=simple_covs,min_effect_size = 0)
+#       print(mr_analysis_res[[currname]]$multivar_egger)
+#       
+#       currname = paste(nn2,nn3,"onesample",sep=",")
+#       if(is.element(currname,set=names(mr_analysis_res))){next}
+#       print(currname)
+#       expo_v = expo_vs[[nn2]]
+#       outcome_v = one_sample_outcome_vs[[nn3]]
+#       inds = intersect(names(expo_v),names(outcome_v))
+#       print(chisq.test(table(cut(expo_v[inds],5),outcome_v[inds]))$p.value)
+#       currsnps = intersect(snp_lists[[nn2]],colnames(geno_data))
+#       mr_analysis_res[[currname]] = 
+#         run_mr_analysis(expo_v,outcome_v,geno_data[,currsnps],covs=simple_covs,min_effect_size = 0)
+#       print(mr_analysis_res[[currname]]$multivar_egger)
+#     }
+#   }
 }
-save(mr_analysis_res,file="/Users/David/Desktop/ukbb/gwas_interpretation/mr/results_nov_1_2017.RData")
-# Create a slim version of the results - remove the lm objects
-sapply(mr_analysis_res[[1]],class)
-for (i in 1:length(mr_analysis_res)){
-  mr_analysis_res[[i]]$unival_outcome_lm = NULL
-  mr_analysis_res[[i]]$univar_expo_lm = NULL
-}
-gc()
-save(mr_analysis_res,file="/Users/David/Desktop/ukbb/gwas_interpretation/mr/results_nov_1_2017_slim.RData")
+# save(mr_analysis_res,file="/Users/David/Desktop/ukbb/gwas_interpretation/mr/results_nov_1_2017.RData")
+# # Create a slim version of the results - remove the lm objects
+# sapply(mr_analysis_res[[1]],class)
+# for (i in 1:length(mr_analysis_res)){
+#   mr_analysis_res[[i]]$unival_outcome_lm = NULL
+#   mr_analysis_res[[i]]$univar_expo_lm = NULL
+# }
+# gc()
+# save(mr_analysis_res,file="/Users/David/Desktop/ukbb/gwas_interpretation/mr/results_nov_1_2017_slim.RData")
 
 load("/Users/David/Desktop/ukbb/gwas_interpretation/mr/results_nov_1_2017_slim.RData")
 
@@ -388,45 +401,105 @@ names(gws) = rownames(geno_data)
 out_name = strsplit(nn,split=',')[[1]][2]
 inds = intersect(names(gws),names(outcome_vs[[out_name]]))
 out_v = outcome_vs[[out_name]][inds];xx = gws[inds]
-boxplot(xx~out_v)
-summary(lm(xx~out_v))
+
+# For each disease look at sick vs healthy:
+# Exercise HR
+# RHR
+# gws in exercise and non exercise subjects
+icd_cols_corr_analysis = c()
+get_disease_vs_scores_est<-function(x,y,sampsize=1000){
+  inds = intersect(names(x),names(y))
+  x = x[inds];y=y[inds]
+  x1 = x[y==0]
+  x2 = x[y==1]
+  if(length(x2)<5){return(c(NA,NA,NA))}
+  lmobj = summary(lm(x~y))$coefficients
+  beta = lmobj[2,1]
+  betap = lmobj[2,4]
+  samp1 = sample(x1,min(length(x1),sampsize))
+  samp2=sample(x2,min(length(x2),sampsize))
+  pval = wilcox.test(samp1,samp2)$p.value
+  return(c(beta,betap,pval))
+}
+library(speedglm)
+get_disease_vs_scores_est_with_covs<-function(x,y,covs,useglm=F){
+  inds = intersect(names(x),names(y))
+  inds = intersect(inds,rownames(covs))
+  x = x[inds];y=y[inds];covs=covs[inds,]
+  d=data.frame(x=x,y=y,covs=covs)
+  if(!useglm){
+    lmobj = summary(lm(x~.,data=d))$coefficients
+    betay = lmobj["y",1]
+    betayp = lmobj["y",4]
+    return(c(betay,betayp))
+  }
+  logiobj = speedglm(factor(y)~.,family=binomial(link='logit'),data=d)
+  logiobj = summary(logiobj)
+  logiobj = as.matrix(logiobj$coefficients)
+  mode(logiobj) = 'numeric'
+  betax = logiobj["x",1]
+  betaxp = logiobj["x",4]
+  return(c(betax,betaxp))
+}
+for(j in 1:ncol(icd_data)){
+  disease_v = icd_data[,j]
+  names(disease_v) = rownames(icd_data)
+  expo_res = get_disease_vs_scores_est(expo_vs$ExerciseHR,disease_v)
+  gws_res = get_disease_vs_scores_est(gws,disease_v)
+  rhr_res = get_disease_vs_scores_est(rhr,disease_v)
+  icd_cols_corr_analysis = rbind(icd_cols_corr_analysis,
+    c(expo_res,gws_res,rhr_res))
+  rownames(icd_cols_corr_analysis)[nrow(icd_cols_corr_analysis)] = colnames(icd_data)[j]
+  print(colnames(icd_data)[j])
+  print(rhr_res)
+}
+icd_cols_corr_analysis["R001",]
+ord = order(icd_cols_corr_analysis[,9])
+icd_cols_corr_analysis[ord,]
+ord = order(icd_cols_corr_analysis[,6])
+icd_cols_corr_analysis[ord,]
+
+icd_cols_adjusted_corr_analysis = c()
+batch_inds = grepl(colnames(simple_covs),pattern="batch")
+for(j in 1:ncol(icd_data)){
+  disease_v = icd_data[,j]
+  names(disease_v) = rownames(icd_data)
+  expo_res = get_disease_vs_scores_est_with_covs(expo_vs$ExerciseHR,disease_v,simple_covs[,!batch_inds])
+  gws_res = get_disease_vs_scores_est_with_covs(gws,disease_v,simple_covs[,!batch_inds])
+  rhr_res = get_disease_vs_scores_est_with_covs(rhr,disease_v,simple_covs[,!batch_inds])
+  icd_cols_adjusted_corr_analysis = rbind(icd_cols_adjusted_corr_analysis,
+                                 c(expo_res,gws_res,rhr_res))
+  rownames(icd_cols_adjusted_corr_analysis)[nrow(icd_cols_adjusted_corr_analysis)] = colnames(icd_data)[j]
+  print(colnames(icd_data)[j])
+  print(rhr_res)
+}
+
+# Main features for exploratory analysis
+brady = icd_data[,"R001"];names(brady)=rownames(icd_data)
 expo_name = strsplit(nn,split=',')[[1]][1]
 expo_v = expo_vs[[expo_name]]
+outcome_v = transform_outcome_to_binary(rowSums(icd_outcome_matrices[[out_name]]))
+bradyY = paste(outcome_v,brady[names(outcome_v)],sep=',')
+names(bradyY) = names(outcome_v)
+boxplot(rhr[names(outcome_v)]~bradyY)
+
+
 out_v2 = one_sample_outcome_vs[[out_name]]
 inds2 = intersect(names(out_v2),names(expo_v))
 inds2 = names(expo_v)[!is.na(expo_v)]
 G = gws[inds2];X=expo_v[inds2];Y=out_v2[inds2]
-summary(lm(Y~G))
-summary(lm(X~G))
-boxplot(G~Y)
-boxplot(X~Y)
-boxplot(rhr[names(Y)]~Y)
+par(mfrow=c(1,3));boxplot(G~Y);boxplot(X~Y);boxplot(rhr[names(Y)]~Y)
+table(Y,brady[inds2])
+bradyY = paste(Y,brady[inds2],sep=',')
+boxplot(X~bradyY)
+
 load("/Users/david/Desktop/ukbb/subject2exercise_category.RData")
 Z = subj2category[inds2]
+cat1_subjects = inds2[grepl(pattern="Category 2",Z[inds2])]
+boxplot(X[cat1_subjects]~Y[cat1_subjects])
+
 M = icd_outcome_matrices[[out_name]][inds2,]
 G2 = gws[setdiff(inds,inds2)];Y2=out_v[setdiff(inds,inds2)]
-boxplot(rhr[names(Z)]~Z)
-table(Z)
-# Look at other covariates
-U = covariate_matrix
-YY = c(Y,Y2)
-par(mfrow=c(3,3))
-for(j in 1:ncol(U)){
-  u = U[,j];names(u)=rownames(U)
-  currname = colnames(U)[j]
-  is_num = is.element("numeric",set=class(U[[j]])) || is.element("integer",set=class(U[[j]]))
-  u = u[names(YY)]
-  if(is_num){
-    u1 = u[YY==1];u0 = u[YY==0]
-    ks.test(u1,u0)$p.value
-    boxplot(u~YY,main=currname)
-  }
-  else{
-    tt = table(u,YY)
-    tt = table(u,YY)/rowSums(tt)
-  }
-  Sys.sleep(2)
-}
 
 # Show disease vs. RHR in different age and sex strata
 AGE = simple_covs[,2];names(AGE) = rownames(simple_covs)
@@ -437,7 +510,9 @@ ZZ = paste("Sex:",U2[,1],", Age:",U2[,2],sep='')
 table(ZZ)
 AC1 = covariate_matrix[,"Number of days/week of moderate physical activity 10+ minutes"]
 AC2 = covariate_matrix[,"Number of days/week of vigorous physical activity 10+ minutes"]
-names(AC1) = rownames(covariate_matrix);names(AC2) = rownames(covariate_matrix)
+AC3 = covariate_matrix[,"Time spend outdoors in summer"]
+AC4 = covariate_matrix[,"Number of days/week walked 10+ minutes"]
+names(AC1) = rownames(covariate_matrix);names(AC2) = rownames(covariate_matrix);names(AC3) = rownames(covariate_matrix)
 par(mfrow=c(2,5))
 for(strat in sort(unique(ZZ))){
   inds = names(YY)[ZZ==strat]
@@ -451,7 +526,7 @@ for(strat in sort(unique(ZZ))){
 }
 for(strat in sort(unique(ZZ))){
   inds = names(YY)[ZZ==strat]
-  curr_rhr = AC2[inds]
+  curr_rhr = AC3[inds]
   inds = names(curr_rhr)[curr_rhr>=0]
   curr_rhr = curr_rhr[inds]
   curr_y = YY[inds]
@@ -459,12 +534,17 @@ for(strat in sort(unique(ZZ))){
   curr_names = paste(paste(names(curr_tt),",N=",curr_tt,sep=''))
   boxplot(curr_rhr~curr_y,main=strat,names=curr_names,ylab="Activity")
 }
-inds = intersect(names(YY),names(rhr))
+inds = intersect(names(outcome_v),names(rhr))
 d = data.frame(rhr=rhr[inds],Sex=simple_covs[inds,1],
-               Age=simple_covs[inds,2],Age2 = AGE2[inds],HeartDisease=YY[inds])
+               Age=simple_covs[inds,2],
+               Age2 = AGE2[inds],HeartDisease=YY[inds],
+               AC1 = AC1[inds],AC2=AC2[inds],AC3=AC3[inds])
+d2 = data.frame(rhr=rhr[inds],covs=covariate_matrix[inds,feature_is_numeric],
+                HeartDisease=YY[inds])
 boxplot(rhr~Sex,data=d)
 boxplot(rhr~HeartDisease,data=d)
 summary(lm(rhr~.,data=d))
+tempsum = summary(lm(rhr~.,data=d2))
 
 # Redo MR, age<50
 age_thr=55
@@ -631,7 +711,7 @@ run_mr_analysis<-function(expo_v,outcome_v,snps,covs=NULL,plot_mr_in=T,min_effec
 #install.packages("bnlearn")
 library(bnlearn)
 # d must have x,y, and z
-run_discrete_ci_test<-function(d,cutsize=10){
+run_discrete_ci_test<-function(d,cutsize=5){
   d = d[!apply(is.na(d),1,any),]
   for(nn in names(d)){
     if(is.numeric(d[[nn]])){

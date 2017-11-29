@@ -771,13 +771,15 @@ try({
 # 1.6 Estimation of physical fitness scores
 load("fitness_analysis_final_fitness_scores.RData")
 library(corrplot)
+colnames(fitness_scores_matrix) = c("Recovery","ExerciseHR","Slope","MaxWD","Completion")
 # Figure S1.6A
-corrplot(get_pairwise_corrs(fitness_scores_matrix))
+corrplot(get_pairwise_corrs(fitness_scores_matrix[,1:4]))
 # Figure S1.6B
 fully_comps = names(which(subject_technical_class=="C:Large"))
-corrplot(get_pairwise_corrs(fitness_scores_matrix[fully_comps,]))
+corrplot(get_pairwise_corrs(fitness_scores_matrix[fully_comps,1:4]))
 others = setdiff(rownames(fitness_scores_matrix),fully_comps)
-corrplot(get_pairwise_corrs(fitness_scores_matrix[others,]))
+others = others[!is.na(others)]
+corrplot(get_pairwise_corrs(fitness_scores_matrix[others,1:4]))
 # Summary: subjects with fitness scores
 apply(fitness_scores_matrix,2,function(x)table(is.na(x)))
 
@@ -787,7 +789,11 @@ plot.design(HR_ratios_merged,main = colnames(fitness_scores_matrix)[1])
 plot.design(HR_pred_WDs_merged,main = colnames(fitness_scores_matrix)[2])
 plot.design(HR_WD_slopes_merged,main = colnames(fitness_scores_matrix)[3])
 plot.design(max_WDs_merged,main = colnames(fitness_scores_matrix)[4])
-
+par(mfrow=c(2,2))
+boxplot(scores~classes,data=data.frame(HR_ratios_merged),main="Recovery",las=2)
+boxplot(log(scores,10)~classes,data=data.frame(HR_pred_WDs_merged),main="Log ExerciseHR",las=2)
+boxplot(log(scores,10)~classes,data=data.frame(HR_WD_slopes_merged),main="Log Slopes",las=2)
+boxplot(scores~classes,data=data.frame(max_WDs_merged),main="MaxWD",las=2)
 
 # Figure S1.8 - compare shared subjects across the slices
 slice_pair2somparison = list()

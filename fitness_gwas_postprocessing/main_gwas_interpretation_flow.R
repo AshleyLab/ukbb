@@ -170,8 +170,8 @@ p + theme(legend.position="none")
 # Direct SNP annotation
 default_fuma_leadsnps = get_fuma_lead_snp_data(fuma_pooled_analysis_maffilter_path$exercise)
 default_fuma_gwascat = get_fuma_gwascatalog_results(fuma_pooled_analysis_maffilter_path$exercise)
-trait2leadsnps = tapply(default_fuma_gwascat$IndSigSNP,default_fuma_gwascat$Trait,unique)
-trait2leadsnps[["NA"]] = setdiff(default_fuma_leadsnps$rsID,default_fuma_gwascat$IndSigSNP)
+trait2leadsnps = tapply(default_fuma_gwascat$GenomicLocus,default_fuma_gwascat$Trait,unique)
+trait2leadsnps[["NA"]] = setdiff(default_fuma_leadsnps$GenomicLocus,default_fuma_gwascat$GenomicLocus)
 trait2numsnps = sort(sapply(trait2leadsnps,length),decreasing=T)
 names(trait2numsnps) = gsub(names(trait2numsnps) ,pattern="Waist circumference",replace = "Waist circ")
 names(trait2numsnps) = gsub(names(trait2numsnps) ,pattern="adjusted",replace = "adj")
@@ -179,23 +179,23 @@ names(trait2numsnps) = gsub(names(trait2numsnps) ,pattern="joint analysis ",repl
 exercise_trait2numsnps = trait2numsnps
 default_fuma_leadsnps = get_fuma_lead_snp_data(fuma_pooled_analysis_maffilter_path$recovery)
 default_fuma_gwascat = get_fuma_gwascatalog_results(fuma_pooled_analysis_maffilter_path$recovery)
-trait2leadsnps = tapply(default_fuma_gwascat$IndSigSNP,default_fuma_gwascat$Trait,unique)
-trait2leadsnps[["NA"]] = setdiff(default_fuma_leadsnps$rsID,default_fuma_gwascat$IndSigSNP)
+trait2leadsnps = tapply(default_fuma_gwascat$GenomicLocus,default_fuma_gwascat$Trait,unique)
+trait2leadsnps[["NA"]] = setdiff(default_fuma_leadsnps$GenomicLocus,default_fuma_gwascat$GenomicLocus)
 trait2numsnps = sort(sapply(trait2leadsnps,length),decreasing=T)
 names(trait2numsnps) = gsub(names(trait2numsnps) ,pattern="Waist circumference",replace = "Waist circ")
 names(trait2numsnps) = gsub(names(trait2numsnps) ,pattern="adjusted",replace = "adj")
 recovery_trait2numsnps = trait2numsnps
-recovery_trait2numsnps = recovery_trait2numsnps[recovery_trait2numsnps>1]
+recovery_trait2numsnps = recovery_trait2numsnps[recovery_trait2numsnps>1 | names(recovery_trait2numsnps)=="NA"]
 exercise_trait2numsnps = exercise_trait2numsnps[exercise_trait2numsnps>1]
 par(mar=c(5.1, 20.1, 4.1, 2.1))
 rec_cols = rep("cyan",length(recovery_trait2numsnps))
 rec_cols[names(recovery_trait2numsnps)=="NA"] = "black"
 barplot(recovery_trait2numsnps[1:length(recovery_trait2numsnps)],
-        horiz = T,las=2,xlab = "Number of lead SNPs",col=rec_cols,density = 80,space=0)
+        horiz = T,las=2,xlab = "Number of regions",col=rec_cols,density = 80,space=0)
 ex_cols = rep("cyan",length(exercise_trait2numsnps))
 ex_cols[names(exercise_trait2numsnps)=="NA"] = "black"
 barplot(exercise_trait2numsnps[1:length(exercise_trait2numsnps)],
-        horiz = T,las=2,xlab = "Number of lead SNPs",cex.names=0.8,
+        horiz = T,las=2,xlab = "Number of regions",cex.names=0.8,
         col=ex_cols,density = 80,space=0)
 
 # Useful plots for showing enrichments
@@ -289,11 +289,16 @@ inter_genes_names = unlist(entrez2symbol[inter_genes])
 inter_genes_ensembl = entrez2ensmbl[as.character(inter_genes)]
 
 fuma_gene_set1 = ex_fuma_gene_data$symbol
-sapply(meta_analysis_gene_data,get_pairwise_overlap_and_pval,s2=fuma_gene_set1,bg_min_size=20000)
+ex_ps = sapply(meta_analysis_gene_data,get_pairwise_overlap_and_pval,s2=fuma_gene_set1,bg_min_size=20000)
 fuma_gene_set1 = rec_fuma_gene_data$symbol
-sapply(meta_analysis_gene_data,get_pairwise_overlap_and_pval,s2=fuma_gene_set1,bg_min_size=20000)
+rec_ps = sapply(meta_analysis_gene_data,get_pairwise_overlap_and_pval,s2=fuma_gene_set1,bg_min_size=20000)
 fuma_gene_set1 = rhr_fuma_gene_data$symbol
-sapply(meta_analysis_gene_data,get_pairwise_overlap_and_pval,s2=fuma_gene_set1,bg_min_size=20000)
+rhr_ps = sapply(meta_analysis_gene_data,get_pairwise_overlap_and_pval,s2=fuma_gene_set1,bg_min_size=20000)
+meta_analysis_overlap_ps = c(ex_ps[3],rec_ps[3],rhr_ps[3])
+names(meta_analysis_overlap_ps) = c("ExerciseHR","Recovery","RHR")
+par(mfrow=c(1,1),mar=c(4,4,4,4))
+barplot(-log(meta_analysis_overlap_ps,10),main="Significance of overlap with meta-analysis",
+        ylab = "-log10 P-value",space = 0)
 
 # Summarize the results in one big table
 m = cbind(is.element(all_mut_genes,set=ex_fuma_gene_data$symbol),is.element(all_mut_genes,set=rec_fuma_gene_data$symbol))
@@ -320,35 +325,35 @@ mut_deg_matrix = mut_deg_matrix[,-c(4:5)]
 mut_deg_matrix[inter_genes_names,"gene_type"] = "MutatedAndDEG"
 write.table(mut_deg_matrix,file="mutation_deg_data_for_network_analysis.txt",sep="\t",quote=F)
 
-# Create input files for ResponseNet
-# Targets: DEGs
-tars = t(t(meta_analysis_gene_data$`META_longterm,muscle`))
-tars = unlist(entrez2ensmbl[rownames(tars)])
-tars = tars[!is.na(tars)]
-tars = t(t(tars));rownames(tars) = tars[,1]
-tars = cbind(rownames(tars),rep("Gene",length(tars)))
-write.table(file="gwas_interpretation/responsenet/pooled_maffilter_targets.txt",tars,row.names = F,quote=F,col.names = F,sep="\t")
-
-# sources: mutated genes, target: expression genes from meta-analysis
-sources = t(t(all_mut_genes_ids))
-sources = unlist(entrez2ensmbl[sources[,1]])
-sources = sources[!is.na(sources)]
-sources = t(t(sources))
-s_weights = rep(0.5,length(sources))
-s_weights[is.element(rownames(sources),set=rownames(tars))] = 1
-sources = cbind(sources,rep("Gene",length(sources)),s_weights)
-write.table(file="gwas_interpretation/responsenet/pooled_maffilter_sources.txt",sources,row.names = F,quote=F,col.names = F,sep="\t")
-
-# Create input files for ResponseNet
-# sources: ONLY exercise mutated genes, target: expression genes from meta-analysis
-sources = t(t(as.character(ex_fuma_gene_data$entrezID)))
-sources = unlist(entrez2ensmbl[sources[,1]])
-sources = sources[!is.na(sources)]
-sources = t(t(sources))
-s_weights = rep(0.5,length(sources))
-s_weights[is.element(rownames(sources),set=rownames(tars))] = 1
-sources = cbind(sources,rep("Gene",length(sources)),s_weights)
-write.table(file="gwas_interpretation/responsenet/pooled_maffilter_exercise_only_sources.txt",sources,row.names = F,quote=F,col.names = F,sep="\t")
+# # Create input files for ResponseNet
+# # Targets: DEGs
+# tars = t(t(meta_analysis_gene_data$`META_longterm,muscle`))
+# tars = unlist(entrez2ensmbl[rownames(tars)])
+# tars = tars[!is.na(tars)]
+# tars = t(t(tars));rownames(tars) = tars[,1]
+# tars = cbind(rownames(tars),rep("Gene",length(tars)))
+# write.table(file="gwas_interpretation/responsenet/pooled_maffilter_targets.txt",tars,row.names = F,quote=F,col.names = F,sep="\t")
+# 
+# # sources: mutated genes, target: expression genes from meta-analysis
+# sources = t(t(all_mut_genes_ids))
+# sources = unlist(entrez2ensmbl[sources[,1]])
+# sources = sources[!is.na(sources)]
+# sources = t(t(sources))
+# s_weights = rep(0.5,length(sources))
+# s_weights[is.element(rownames(sources),set=rownames(tars))] = 1
+# sources = cbind(sources,rep("Gene",length(sources)),s_weights)
+# write.table(file="gwas_interpretation/responsenet/pooled_maffilter_sources.txt",sources,row.names = F,quote=F,col.names = F,sep="\t")
+# 
+# # Create input files for ResponseNet
+# # sources: ONLY exercise mutated genes, target: expression genes from meta-analysis
+# sources = t(t(as.character(ex_fuma_gene_data$entrezID)))
+# sources = unlist(entrez2ensmbl[sources[,1]])
+# sources = sources[!is.na(sources)]
+# sources = t(t(sources))
+# s_weights = rep(0.5,length(sources))
+# s_weights[is.element(rownames(sources),set=rownames(tars))] = 1
+# sources = cbind(sources,rep("Gene",length(sources)),s_weights)
+# write.table(file="gwas_interpretation/responsenet/pooled_maffilter_exercise_only_sources.txt",sources,row.names = F,quote=F,col.names = F,sep="\t")
 
 # Methods for comparing a pair of GWAS runs in different ways
 library(Vennerable)
@@ -362,7 +367,9 @@ region_based_comparison<-function(path1,path2){
 }
 snp_based_comparison<-function(path1,path2,ukbb_maf = snp2maf){
   res1 = get_fuma_all_snp_data(path1)
+  res1 = res1[!is.na(res1$gwasP),]
   res2 = get_fuma_all_snp_data(path2)
+  res2 = res2[!is.na(res2$gwasP),]
   all_snps = union(res1$rsID,res2$rsID)
   summat = cbind(is.element(all_snps,set=res1$rsID),is.element(all_snps,set=res2$rsID))
   fuma_mafs = rep(0,length(all_snps));names(fuma_mafs) = all_snps
@@ -387,13 +394,17 @@ enrichment_based_comparison<-function(path1,path2,types=c("GWAScatalog"),adjP_th
 }
 
 # Saturation analysis
-num_loci = sapply(saturation_analysis_paths,function(x)length(unique(get_fuma_lead_snp_data(x)$GenomicLocus)))
-plot(x=names(num_loci),y=num_loci,type="l",pch=20,lwd=4,ylab = "Number of regions",col="darkblue",
+num_loci = sapply(saturation_analysis_paths$exercise,function(x)length(unique(get_fuma_lead_snp_data(x)$GenomicLocus)))
+num_leads = sapply(saturation_analysis_paths$exercise,function(x)length(unique(get_fuma_lead_snp_data(x)$rsID)))
+par(mfrow=c(1,1),mar=c(5,5,5,5))
+plot(x=names(num_leads),y=num_loci,type="l",pch=20,lwd=4,ylab = "Number of regions",col="darkblue",
      xlab = "Percent sampled, Exercise HR",ylim=c(0,250),xlim = c(30,105))
+plot(x=names(num_leads),y=num_loci,type="l",pch=20,lwd=4,ylab = "Number of lead SNPs",col="darkblue",
+     xlab = "Percent sampled, Exercise HR",xlim = c(30,105))
 
 # Exercise HR: Get pairwise comparison between 67% and 85%
-p1 = saturation_analysis_paths$`67`
-p2 = saturation_analysis_paths$`85`
+p1 = saturation_analysis_paths$exercise$`67`
+p2 = saturation_analysis_paths$exercise$`85`
 snp_comp = snp_based_comparison(p1,p2,snp2maf)
 snp_sets = rep("85",nrow(snp_comp))
 snp_sets[snp_comp[,1]==1] = "67"
@@ -406,10 +417,10 @@ gp = VennThemes(compute.Venn(V))
 gp_cols = sapply(gp$Face,function(x)x$col)
 plot(V,doWeights=T)
 
-vioplot_data = data.frame(list(logMAF=log(snp_comp[,4],10),set=snp_sets))
+vioplot_data = data.frame(list(MAF=snp_comp[,3],set=snp_sets))
 vioplot_data[,1] = as.numeric(as.character(vioplot_data[,1]))
 vioplot_data[,2] = factor(vioplot_data[,2],levels = c("67","both","85"))
-p <- ggplot(vioplot_data, aes(x=set, y=logMAF,fill=set)) + geom_violin(scale="width")
+p <- ggplot(vioplot_data, aes(x=set, y=MAF,fill=set)) + geom_violin(scale="width")
 p + scale_fill_manual(values=c('67'= unname(gp_cols['10.10']), '85'=unname(gp_cols['01.01']), "both"=unname(gp_cols[1]))) + theme_classic()
 
 # Exercise HR: Stratify p-values by the MAF
@@ -438,14 +449,14 @@ p + scale_fill_manual(values=c('67'= unname(gp_cols['10.10']), '85'=unname(gp_co
 #        xlab="Expected -log10 P-value",ylab = "Observed -log10 P-value",cex=0.8);abline(0,1)
 # qqplot(samp1,samp2);abline(0,1)
 
-# Look at the hemoglobin SNPs
-# These selected snps had p<1e-4
-# This computation was done directly using the MR code
-hemo_lead_snps = c("rs9705925","rs7299011","rs13321817","rs12648115","rs9784505","rs16891982","rs3756298","rs1896910" )
-exercise_leadsnps = get_fuma_lead_snp_data(fuma_pooled_analysis_maffilter_path$exercise)
-recovery_leadsnps = get_fuma_lead_snp_data(fuma_pooled_analysis_maffilter_path$recovery)
-table(is.element(hemo_lead_snps,set=exercise_leadsnps$rsID))
-table(is.element(hemo_lead_snps,set=recovery_leadsnps$rsID))
-exercise_snps = get_fuma_all_snp_data(fuma_pooled_analysis_maffilter_path$exercise)
-write.table(exercise_snps[hemo_lead_snps,c("MAF","nearestGene")],sep="\t",quote=F)
+# # Look at the hemoglobin SNPs
+# # These selected snps had p<1e-4
+# # This computation was done directly using the MR code
+# hemo_lead_snps = c("rs9705925","rs7299011","rs13321817","rs12648115","rs9784505","rs16891982","rs3756298","rs1896910" )
+# exercise_leadsnps = get_fuma_lead_snp_data(fuma_pooled_analysis_maffilter_path$exercise)
+# recovery_leadsnps = get_fuma_lead_snp_data(fuma_pooled_analysis_maffilter_path$recovery)
+# table(is.element(hemo_lead_snps,set=exercise_leadsnps$rsID))
+# table(is.element(hemo_lead_snps,set=recovery_leadsnps$rsID))
+# exercise_snps = get_fuma_all_snp_data(fuma_pooled_analysis_maffilter_path$exercise)
+# write.table(exercise_snps[hemo_lead_snps,c("MAF","nearestGene")],sep="\t",quote=F)
 
