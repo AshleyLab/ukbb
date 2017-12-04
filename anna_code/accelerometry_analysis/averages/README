@@ -1,0 +1,6 @@
+ Purpose of this code is to collapse the number of accelerometry phenotypes in 3 ways: 
+
+1. average acceleration during night (9 pm - 5 am) vs day (5 am - 9pm)
+2. splitting the 24 hour block into 3 sections ( 9 am  - 5 pm -- "standard" work  hours), (5 pm - 12 am -- "standard" after-work hours), (12 am - 9 am -- night-time/morning).
+3. splitting the 24 hour block into 4 sections ( 12 am - 6 am, 6 am - 12 pm, 12 pm - 6 pm, 6 pm - 12 am)
+
