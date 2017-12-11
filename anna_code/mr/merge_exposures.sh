@@ -1,0 +1,1 @@
+python merge_exposures.py --source_pheno accelerometry_aggregate_phenotypes.continuous.no_outliers.txt accelerometery_aggregate_phenotypes.categorical.txt usual_walking_pace_binarized.txt subject_acceleration_interval_averages.txt --features features.txt --outf mr_exposures.txt --subjects subjects.txt
