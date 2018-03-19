@@ -1,5 +1,7 @@
 death_outcome=open('death_status.txt','r').read().strip().split('\n')
 cvd_outcome=open('icd_phenotypes_binary.txt','r').read().strip().split('\n')
+age_assessed=open('age_attended_assessment_center.txt','r').read().strip().split('\n')
+
 #Aggregate MR outcomes into a single dataframe. 
 outf=open('mr_outcome.txt','w')
 outf.write('Subject\tDeathStatus\tDeathAge\tCvdStatus\n')
@@ -25,6 +27,18 @@ for line in cvd_outcome[1::]:
     if fid not in outcomes:
         outcomes[fid]=dict()
     outcomes[fid]['cvd_status']=str(status)
+for line in age_assessed[1::]:
+    tokens=line.split('\t')
+    fid=tokens[0]
+    age=list(set([float(i) for i in tokens[1::] if i!="NA"]))
+    if (len(age)==0):
+        age="NA"
+    else:
+        age=str(max(age))
+    if fid not in outcomes:
+        outcomes[fid]=dict()
+    outcomes[fid]['age_assessed']=str(age) 
+    
 for fid in outcomes:
     outf.write(fid)
     if 'death_status' in outcomes[fid]:
@@ -39,6 +53,10 @@ for fid in outcomes:
         outf.write('\t'+outcomes[fid]['cvd_status'])
     else:
         outf.write('\t')
+    if 'age_assessed' in outcomes[fid]:
+        outf.write('\t'+outcomes[fid]['age_assessed'])
+    else:
+        outf.write('\t') 
     outf.write('\n')
 
         
