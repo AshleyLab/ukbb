@@ -8,6 +8,7 @@ def parse_args():
     parser.add_argument("--thresh",default=0.05,type=float)
     parser.add_argument("--phenotype") 
     parser.add_argument("--outf") 
+    parser.add_argument("--index_col",type=int,default=2)
     return parser.parse_args()
 
 def main(): 
@@ -15,7 +16,7 @@ def main():
     variants=[i.split('\t')[0] for i in open(args.var_list,'r').read().strip().split('\n')]
     outf=open(args.outf,'w')
     for filename in args.gwas_hits: 
-        data=pd.read_table(filename,index_col=2)
+        data=pd.read_table(filename,index_col=args.index_col,delim_whitespace=True)
         print("checking "+str(filename))
         for variant in variants:
             try:
