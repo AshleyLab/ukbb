@@ -3,9 +3,9 @@ import argparse
 #import pdb 
 def parse_args():
     parser=argparse.ArgumentParser(description="generates a subject x ICD code binary matrix for regression against phenotype features")
-    parser.add_argument("--icd_list",default="codes_over_1000.txt")
+    parser.add_argument("--icd_list",default="all_ICD_codes.tsv")
     parser.add_argument("--ukbb_bulk_data",default="/oak/stanford/groups/euan/projects/ukbb/data/bulk_data/ukb9419.tab")
-    parser.add_argument("--outf",default="icd_matrix_for_regression.txt")
+    parser.add_argument("--outf",default="icd_matrix_complete.txt")
     return parser.parse_args()
 
 def main():
@@ -17,6 +17,7 @@ def main():
 
     dataf=open(args.ukbb_bulk_data,'r')
     line=dataf.readline()
+    #skip the header and read the next line 
     line=dataf.readline()
     counter=1
     outf=open(args.outf,'w')
